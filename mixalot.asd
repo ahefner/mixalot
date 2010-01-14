@@ -6,4 +6,6 @@
   :license "MIT-style license"
   :depends-on (:cffi :bordeaux-threads :alexandria)
   :serial t
-  :components ((:file "mixalot")))
+  :components ((:file "ffi-common")
+               (:file "mixalot")))
+

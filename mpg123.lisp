@@ -23,7 +23,7 @@
 ;;;; OTHER DEALINGS IN THE SOFTWARE.
 
 (defpackage :mpg123 
-  (:use :common-lisp :cffi)
+  (:use :common-lisp :cffi :mixalot-ffi-common)
   (:export
            #:mpg123-error
            #:check-mpg123-plain-error
@@ -173,7 +173,8 @@
 
 
 (define-foreign-library libmpg123
-  (:unix (:or "libmpg123.so.0" 
+  (:unix (:or "libmixalot-mpg123.so.0"
+              "libmpg123.so.0"
               "/usr/lib/libmpg123.so"
               "/usr/local/lib/libmpg123.so"))
   (t (:default "libmpg123")))
@@ -183,16 +184,6 @@
 ;;;; Basic types
 
 (defctype handleptr :pointer)
-
-#-CFFI-FEATURES:X86-64
-(defctype size_t :unsigned-int)
-#+CFFI-FEATURES:X86-64
-(defctype size_t :uint64)
-
-#-CFFI-FEATURES:X86-64
-(defctype off_t :int)
-#+CFFI-FEATURES:X86-64
-(defctype off_t :int64)
 
 ;;;; Error handling
 
@@ -848,8 +839,7 @@ list."
               (dump-mpg123-texts "Comment" (id3v2-comment-list v2) (id3v2-comments v2))
               (dump-mpg123-texts "Text"    (id3v2-text v2)         (id3v2-texts v2))
               (dump-mpg123-texts "Extra"   (id3v2-extra v2)        (id3v2-extras v2)))
-            (return (nconc properties
-                           ))))))
+            (return (nconc properties))))))
 
 (defun get-tags-from-file (filename &key 
                            verbose 

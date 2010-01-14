@@ -6,4 +6,5 @@
   :license "MIT-style license"
   :depends-on (:cffi)
   :serial t
-  :components ((:file "mpg123")))
+  :components ((:file "ffi-common")
+               (:file "mpg123")))

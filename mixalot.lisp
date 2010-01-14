@@ -65,6 +65,8 @@
            #:vector-streamer
            #:vector-streamer-mono
            #:make-vector-streamer-mono
+           #:vector-streamer-interleaved-stereo
+           #:make-vector-streamer-interleaved-stereo
            #:vector-streamer-joint-stereo
            #:make-vector-streamer-joint-stereo
            #:fast-vector-streamer-mono
@@ -206,7 +208,7 @@
             "PCM set parameters"
             (snd-pcm-set-params
              pcm :snd-pcm-format-s16-le :snd-pcm-access-rw-interleaved
-             2 rate 1 500000))
+             2 rate 1 100000))
            (funcall continuation pcm))
       (snd-pcm-close pcm))))
 
@@ -398,12 +400,15 @@
   (loop for removed across temp-vector
         do (streamer-cleanup removed mixer)))
 
+(defconstant +mixer-buffer-size+ 4096)
+(deftype mixer-buffer-index () `(integer 0 ,+mixer-buffer-size+))
+
 (defun run-mixer-process (mixer)
  (declare (optimize (speed 3)))
  (unwind-protect
   ;; Body
   (loop with time = 0
-        with buffer-samples = 16384     ; Oops, see below.
+        with buffer-samples = +mixer-buffer-size+
         with buffer = (make-array buffer-samples :element-type '(unsigned-byte 32))
         with playable-streams = (make-array 0 :adjustable t :fill-pointer 0)
         with buffer-clear = nil
@@ -419,17 +424,17 @@
               as offset = 0             ; ...
               do
               (setf buffer-clear nil)
-              (restart-case 
-                  (funcall (if first 
+              (restart-case
+                  (funcall (if first
                                #'streamer-write-into
                                #'streamer-mix-into)
-                           streamer 
+                           streamer
                            mixer
                            buffer
                            offset
                            (- buffer-samples offset)
                            (+ time offset))
-                (remove-streamer () 
+                (remove-streamer ()
                   :report "Delete this audio stream"
                   (mixer-remove-streamer mixer streamer))))
         ;; If there are no playable streams, we have to clear the buffer ourself.
@@ -438,22 +443,27 @@
           (fill buffer 0)
           (setf buffer-clear t))
         ;; Play the buffer.
-        (loop with offset of-type (integer 0 16384) = 0
+        (loop with offset of-type mixer-buffer-index = 0
               as nwrite = (- buffer-samples offset)
               as nframes = (with-array-pointer (ptr buffer)
                              (incf-pointer ptr (* offset 4))
                              (snd-pcm-writei (mixer-pcm-instance mixer) ptr nwrite))
               do
+              (unless (zerop offset)
+                (format t "~&mixer time ~A partial offset ~:D~%"
+                        (mixer-current-time mixer)
+                        offset))
               (cond
                 ((not (integerp nframes)) (error "wtf"))
                 ((< nframes 0)
+                 (format *trace-output* "~&nframes<0, snd-pcm-recover")
                  (snd-pcm-recover (mixer-pcm-instance mixer) nframes 1))
                 ((< nframes nwrite)
-                 (format *trace-output* "~&short write ~D vs ~D (offset ~D)~%" 
+                 (format *trace-output* "~&short write ~D vs ~D (offset ~D)~%"
                          nframes (- buffer-samples offset) offset)
                  (incf offset nframes))
                 (t (loop-finish))))
-                
+
         (incf time buffer-samples)
         (setf (mixer-current-time mixer) time))
    ;; Cleanup. After setting the shutdown flag, it is impossible to
