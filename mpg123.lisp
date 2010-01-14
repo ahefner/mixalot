@@ -173,7 +173,9 @@
 
 
 (define-foreign-library libmpg123
-  (:unix (:or "libmpg123.so.0" "libmpg123.so"))
+  (:unix (:or "libmpg123.so.0" 
+              "/usr/lib/libmpg123.so"
+              "/usr/local/lib/libmpg123.so"))
   (t (:default "libmpg123")))
 
 (use-foreign-library libmpg123)

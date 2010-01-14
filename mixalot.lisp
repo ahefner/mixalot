@@ -79,7 +79,9 @@
 ;;;; FFI to minimal subset of ALSA library
 
 (define-foreign-library libasound
-    (t (:or "libasound.so.2" "libasound.so")))
+    (t (:or "libasound.so.2" "libasound.so"
+            "/usr/lib/libasound.so"
+            "/usr/local/lib/libasound.so")))
 
 (use-foreign-library libasound)
 
