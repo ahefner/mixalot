@@ -338,18 +338,18 @@
     (dolist (streamer (mixer-stream-list mixer))
       (%req-remove-streamer mixer streamer))))      
 
-;;; Obtaining a pointer to an array of unboxed data.  CFFI doesn't
-;;; include this facility, and apparently not all lisps support it. If
-;;; a lisp can't do this, its FFI is lame and probably not worth
-;;; supporting anyway.
+;;; Obtaining a pointer to an array of unboxed data. I used to do this
+;;; myself, but recentish CFFI can do it for me.
+(defmacro with-array-pointer ((name array) &body body)
+  `(cffi-sys:with-pointer-to-vector-data (,name ,array) ,@body))
 
-#+SBCL
+#+NIL
 (defmacro with-array-pointer ((name array) &body body)
   ;; Perhaps does the wrong thing for displaced arrays.
   ;; This will never affect me.
   ;; Also, SBCL gives a very bizarre code deletion warning here
   ;; when compiling the file in SLIME which goes away when I 
-  ;; just compile the definition.
+  ;; compile just the definition.
   `((lambda (arrayoid body)
       (unless (typep arrayoid 'vector)
         (setf arrayoid (sb-kernel:%array-data-vector arrayoid)))
@@ -357,8 +357,6 @@
         (funcall body (sb-sys:vector-sap arrayoid))))
     ,array
     (lambda (,name) ,@body)))
-
-#-SBCL (error "Implement with-array-pointer for your lisp implementation.")
 
 (defmethod streamer-pause (stream (mixer mixer))
   (with-mixer-lock (mixer)
@@ -403,9 +401,8 @@
  (unwind-protect
   ;; Body
   (loop with time = 0
-        with buffer-samples = 16384
-        with buffer-words   = 32768
-        with buffer = (make-array buffer-words :element-type '(unsigned-byte 32))
+        with buffer-samples = 16384     ; Oops, see below.
+        with buffer = (make-array buffer-samples :element-type '(unsigned-byte 32))
         with playable-streams = (make-array 0 :adjustable t :fill-pointer 0)
         with buffer-clear = nil
         until (mixer-shutdown-flag mixer)
@@ -439,13 +436,22 @@
           (fill buffer 0)
           (setf buffer-clear t))
         ;; Play the buffer.
-        (let ((nframes (with-array-pointer (ptr buffer)
-                         (snd-pcm-writei (mixer-pcm-instance mixer) ptr buffer-samples))))
-          (cond
-            ((< nframes 0)
-             (snd-pcm-recover (mixer-pcm-instance mixer) nframes 1))
-            ((< nframes buffer-samples) 
-             (format *trace-output* "~&short write ~D vs ~D?~%" nframes buffer-samples))))
+        (loop with offset of-type (integer 0 16384) = 0
+              as nwrite = (- buffer-samples offset)
+              as nframes = (with-array-pointer (ptr buffer)
+                             (incf-pointer ptr (* offset 4))
+                             (snd-pcm-writei (mixer-pcm-instance mixer) ptr nwrite))
+              do
+              (cond
+                ((not (integerp nframes)) (error "wtf"))
+                ((< nframes 0)
+                 (snd-pcm-recover (mixer-pcm-instance mixer) nframes 1))
+                ((< nframes nwrite)
+                 (format *trace-output* "~&short write ~D vs ~D (offset ~D)~%" 
+                         nframes (- buffer-samples offset) offset)
+                 (incf offset nframes))
+                (t (loop-finish))))
+                
         (incf time buffer-samples)
         (setf (mixer-current-time mixer) time))
    ;; Cleanup. After setting the shutdown flag, it is impossible to
@@ -481,7 +487,8 @@
                  mono->stereo stereo-left stereo-right
                  %stereo-left %stereo-right
                  split-sample
-                 mix-stereo-samples add-stereo-samples))
+                 mix-stereo-samples add-stereo-samples
+                 scale-sample scale-stereo-sample))
 
 (defun stereo-sample (left right)
   (declare (optimize (speed 3))
@@ -526,13 +533,29 @@
                  (clamp-sample+ (stereo-right x) (stereo-right y))))
 
 (defun add-stereo-samples (x y) 
-    "Add two stereo samples, without clipping."
+  "Add two stereo samples, without clipping."
   (declare (optimize (speed 3)) (type stereo-sample x y))
   (logior (logand #xFFFF (+ x y))
           (logand #xFFFF0000 (+ x (logand #xFFFF0000 y))))
   #+NIL ;; Equivalent, slower version:
   (stereo-sample (logand #xFFFF (+ (%stereo-left x) (%stereo-left y)))
                  (logand #xFFFF (+ (%stereo-right x) (%stereo-right y)))))
+
+(defun scale-sample (x y)
+  (declare (optimize (speed 3))
+           (type mono-sample x y))
+  (ash (* x y) -16))
+
+(defun scale-stereo-sample (stereo scale)
+  (declare (optimize (speed 3))
+           (type stereo-sample stereo)
+           (type (signed-byte 16) scale))
+  #+NIL
+  (logior (logand #xFFFF0000 (* scale (ash stereo -16)))
+          (logand #x0000FFFF (ash (* (logand stereo #xFFFF) scale) -16)))
+
+  (stereo-sample (scale-sample (stereo-left  stereo) scale)
+                 (scale-sample (stereo-right stereo) scale)))
 
 (define-modify-macro stereo-incf (sample) add-stereo-samples)
 (define-modify-macro stereo-mixf (sample) mix-stereo-samples)
@@ -628,9 +651,12 @@
 (define-vector-streamer  fast-vector-streamer-joint-stereo
     sample-vector 1 (aref vector vector-index))
 
-(defmethod streamer-seekable-p ((stream vector-streamer) mixer) t)
+(defmethod streamer-seekable-p ((stream vector-streamer) mixer)
+  (declare (ignore mixer))
+  t)
 
 (defmethod streamer-length ((stream vector-streamer) mixer)
+  (declare (ignore mixer))
   (/ (- (end stream) (start stream))
      (elts-per-sample stream)))
 
@@ -639,6 +665,7 @@
 ;;; previous seek pending, but I don't think it's worth coding around.
 (defmethod streamer-seek
     ((stream vector-streamer) mixer position &key &allow-other-keys)
+  (declare (ignore mixer))
   (setf (seek-to stream) (min (- (end stream) (elts-per-sample stream))
                               (max (start stream)
                                    (+ (* (elts-per-sample stream)
@@ -646,6 +673,7 @@
                                       (start stream))))))
 
 (defmethod streamer-position ((stream vector-streamer) mixer)
+  (declare (ignore mixer))
   (floor (- (position-of stream)
             (start stream))
          (elts-per-sample stream)))

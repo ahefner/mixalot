@@ -167,7 +167,7 @@
 
            #:get-tags-from-handle
            #:get-tags-from-file           
-           ))
+           #:decode-mp3-file))
 
 (in-package :mpg123)
 
@@ -636,6 +636,9 @@ initialized the library can be used in a threaded fashion."
 
 ;;;; ID3 utilities
 
+(defvar *id3-no-unicode* nil
+  "If true, always convert id3 values as ISO-8859-1.")
+
 (defun safely-convert-string (c-string-ptr encoding 
                               &optional (max-length (1- array-total-size-limit)))
   "Safely convert a C string to a lisp string under the specified
@@ -654,7 +657,8 @@ encoding."
   encoding. If that fails, converts it using ISO-8859-1. Returns two
   values: the converted lisp string, and the encoding used (one
   of :utf-8 or :iso-8859-1)."
-  (let ((utf-8 (safely-convert-string c-string-ptr :utf-8)))
+  (let ((utf-8 (and (not *id3-no-unicode*)
+                    (safely-convert-string c-string-ptr :utf-8))))
     (cond (utf-8 (values utf-8 :utf-8))
           (t (safely-convert-string c-string-ptr :iso-8859-1)))))
 
@@ -663,6 +667,8 @@ encoding."
 
 ;;; My policy: Prefer utf-8 for ID3v2 fields then fall back to
 ;;; iso-8859-1. Always convert ID3v1 fields as iso-8859-1.
+;;; Except when id3-no-unicode* is on, because in practice,
+;;; unicode strings just break everything.
 
 (defun get-id3v2-field (v2 v2-accessor)
   (and (not (null-pointer-p v2))
@@ -789,7 +795,7 @@ encoding."
                       (char= (aref year 1) #\0)))
          year))))
 
-(defun get-tags-from-handle (handle &key print-misc-tags)
+(defun get-tags-from-handle (handle &key print-misc-tags (no-utf8 nil))
 "Parse ID3 from the given mpg123 handle and return some subset of 
 title, artist, album, year, comment, tack, and genre as a property 
 list."
@@ -797,7 +803,8 @@ list."
                          (v2p '(:pointer mpg123-id3v2)))
     (check-mh-error "Get ID3 tags" handle (mpg123-id3 handle v1p v2p))
     (let ((v1 (mem-ref v1p :pointer))
-          (v2 (mem-ref v2p :pointer)))
+          (v2 (mem-ref v2p :pointer))
+          (*id3-no-unicode* no-utf8))
       (loop for (keyword v2-accessor v1-slot v1-field-width) in
             '((:title   id3v2-title   title   30)
               (:artist  id3v2-artist  artist  30)
@@ -814,34 +821,58 @@ list."
               (if year
                   (setf (getf properties :year) year)
                   (remf properties :year)))
+            (setf properties (nconc properties 
+                                    (property :track (get-track v1 v2))
+                                    (property :genre (get-genre v1 v2))))
+            ;; No such thing as track 0. Some files have track in comment field.
             (when (eql 0 (getf properties :track)) (remf properties :track))
+            (when (and (eql 6 (mismatch (getf properties :comment) "Track ")))
+              (let ((tr (parse-integer (getf properties :comment) :start 6 :junk-allowed t)))
+                (when (and tr (> tr 0) (< tr 100))
+                  (remf properties :comment)
+                  (setf (getf properties :track) tr))))
+            ;; Remove tags for unknown artist or unknown disc, because that's a nuisance.
+            (when (member (getf properties :artist)
+                          '("Unknown" "Unknown Artist" "<Unknown>")
+                          :test #'equalp)
+              (remf properties :artist))
+            (when (or (member (getf properties :album)
+                              '("Unknown" "Unknown Disc" "<Unknown>")                      
+                              :test #'equalp)
+                      (eql 14 (mismatch "Unknown Album " (getf properties :album))))
+              (remf properties :artist))
             ;; Debugging: Print all text entries, if enabled
             (when (and print-misc-tags (not (null-pointer-p v2)))
               (dump-mpg123-texts "Comment" (id3v2-comment-list v2) (id3v2-comments v2))
               (dump-mpg123-texts "Text"    (id3v2-text v2)         (id3v2-texts v2))
               (dump-mpg123-texts "Extra"   (id3v2-extra v2)        (id3v2-extras v2)))
             (return (nconc properties
-                           (property :track (get-track v1 v2))
-                           (property :genre (get-genre v1 v2))))))))
+                           ))))))
 
-(defun get-tags-from-file (filename &key (character-encoding :iso-8859-1))
+(defun get-tags-from-file (filename &key 
+                           verbose 
+                           (character-encoding :iso-8859-1)
+                           (no-utf8 nil))
   "Parse ID3 tags of the given file and return some subset of title,
 artist, album, year, comment, tack, and genre as a property list."
   (ensure-libmpg123-initialized)
   (with-foreign-object (err :int)
     (let ((handle (mpg123-new (null-pointer) err)))
       (check-mpg123-plain-error "mpg123-new" (mem-ref err :int))
+      (unless verbose
+        (mpg123-param handle :add-flags MPG123_QUIET 0.0d0))
       (with-foreign-string (unmangled filename :encoding character-encoding)
         (check-mh-error "mpg123 open file" handle (mpg123-open handle unmangled)))
       (unwind-protect 
            (progn
              (mpg123-getformat handle)                  
-             (get-tags-from-handle handle))
-        (mpg123-close handle)))))
+             (get-tags-from-handle handle :no-utf8 no-utf8))
+        (mpg123-close handle)
+        (mpg123-delete handle)))))
 
 ;;; Easy decoding of an MP3 file:
 
-(defun decode-mp3-file (filename &key (character-encoding :iso-8859-1))
+(defun decode-mp3-file (filename &key verbose (character-encoding :iso-8859-1))
   "Decode an mp3 file, returning four values: a vector containing the samples
    (in 16-bit format), and rate, channels, and encoding corresponding to the
    return values of mpg123-getformat."
@@ -849,6 +880,8 @@ artist, album, year, comment, tack, and genre as a property list."
   (with-foreign-object (err :int)
     (let ((handle (mpg123-new (null-pointer) err)))
       (check-mpg123-plain-error "mpg123-new" (mem-ref err :int))
+      (unless verbose 
+        (mpg123-param handle :add-flags MPG123_QUIET 0.0d0))
       (with-foreign-string (unmangled filename :encoding character-encoding)
         (check-mh-error "mpg123 open file" handle (mpg123-open handle unmangled)))
       (unwind-protect
@@ -874,4 +907,5 @@ artist, album, year, comment, tack, and genre as a property list."
                          (cerror "Ignore it." "Unexpected decoding error ~D!" err))
                        (return-from decode-mp3-file
                          (values buffer rate channels encoding))))))
-        (mpg123-close handle)))))
+        (mpg123-close handle)
+        (mpg123-delete handle)))))

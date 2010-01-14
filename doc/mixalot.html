@@ -48,7 +48,6 @@
 
   <li><a href="#mpg123-ffi">System: mpg123-ffi</a></li>
   <li><a href="#mixalot-mp3">System: mixalot-mp3</a></li>
-  <li><a href="#shuffletron">Example: shuffletron</a></li>
   <li><a href="#future-work">Future Work</a></li>
 </ol>
 
@@ -57,11 +56,11 @@
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="Introduction"></a>Introduction</h2>
 
-<p>Mixalot is a grab bag of systems related to audio in Common
-Lisp. Currently it consists of a mixer component targeting the
-Advanced Linux Sound Architecture, a CFFI binding to the libmpg123
-library, and a system allowing playback of MP3 files through the
-mixer.</p>
+<p>Mixalot is a grab bag of systems related to audio in Common Lisp
+under an MIT-style license. Currently it consists of a mixer component
+targeting the Advanced Linux Sound Architecture, a CFFI binding to the
+libmpg123 library, and a system allowing playback of MP3 files through
+the mixer.</p>
 
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="Installation"></a>Installation</h2>
@@ -76,22 +75,26 @@ mixer.</p>
   <li>Alexandria</li>
 </ul>
 
+<p>You may find this library useful for the following purposes:</p>
+<ul>
+  <li>Audio output in Linux, if you aren't overly concerned with latency</li>
+  <li>Decoding an mp3 file to a vector</li>
+  <li>Playing an mp3 file</li>
+  <li>Querying id3 tags</li>
+</ul>
+
 
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="Portability"></a>Portability</h2>
 
 <p>The CFFI and bordeaux-threads libraries are used to ease porting
 between lisp implementations. The mixer component of Mixalot relies on
-ALSA and as such will only run on Linux systems. The mixer also relies
-on ability to obtain a foreign pointer to a lisp array, which CFFI
-does not provide, and this has only been implemented for SBCL so
-far. In order to be useful in an application, the mixer must also be
-run in its own thread. Therefore, the <tt>mixalot</tt>
-and <tt>mixalot-mp3</tt> systems are currently usable only on SBCL
-(with threads) under Linux. The <tt>mpg123-ffi</tt> system should be
-usable on any lisp that supports CFFI. Shuffletron, the music player
-example, additionally relies on the sb-posix library for filesystem
-access.
+ALSA and as such will only run on Linux systems. In order to be useful
+in an application, the mixer must also run in its own (native)
+thread. Therefore, the <tt>mixalot</tt> and <tt>mixalot-mp3</tt>
+systems are currently usable only on SBCL (w/sb-thread) and Clozure
+Common Lisp under Linux. The <tt>mpg123-ffi</tt> system should be
+usable on any lisp that supports CFFI.
 </p>
 
 <!--  ----------------------------------------------------------------- -->
@@ -783,11 +786,12 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 
 <div class="def"><a name="get-tags-from-file">Function</a>
                        <b>get-tags-from-file</b> 
- <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
+ <i>filename <tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
  <div class="docbody">
    <p>Open an MP3 file, examine its tags
       using <a href="#get-tags-from-handle">get-tags-from-handle</a>,
-      and return the resulting <i>plist</i>.</p>
+      and return the resulting <i>plist</i>. Unless <i>verbose</i> is true,
+      messages from the library are suppressed.</p>
    <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
       <tt>(latin-1)</tt> before being passed to C; to avoid encoding
       problems on non-ASCII filenames, it is recommended you obtain
@@ -802,13 +806,14 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 
 <div class="def"><a name="decode-mp3-file">Function</a>
                        <b>decode-mp3-file</b>
- <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i> &rArr; <i>vector rate channels encoding</i>
+ <i>filename <tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> &rArr; <i>vector rate channels encoding</i>
  <div class="docbody">
    <p>Opens and decodes an MP3 file, returning a <i>vector</i> of
    samples, a <tt>(simple-array (signed-byte 16) 1)</tt>, interleaved, with one array 
    element per channel.
    The <tt>:character-encoding</tt> keyword chooses how the <i>filename</i> is encoded as a C string.
    Additionally, the <i>rate</i>, <i>channels</i>, and <i>encoding</i> () of the file are returned (see <a href="#mpg123-getformat">mpg123-getformat</a>).
+   Unless <i>verbose</i> is true, messages from the library are suppressed.
    </p>
  </div>
 </div>
@@ -888,27 +893,15 @@ CL-USER> (mixalot:mixer-add-streamer *mixer*
 
 <!--  ----------------------------------------------------------------- -->
 
-<a name='shuffletron'></a><h2>Example: Shuffletron</h2>
-<p>Shuffletron is an MP3 player with a textual interface, and an example program using the Mixalot systems. It requires Linux and SBCL with threads, and the <a href="http://utopia.knoware.nl/~hlub/rlwrap/man.html">rlwrap</a> program is strongly recommended. It has the following features:</p>
-<ul>
-  <li>MP3 playback</li>
-  <li>Simple, rapid searching of music files</li>
-  <li>Queueing of files, with shuffle and looping mode</li>
-  <li>Alarm clock mode (unpause/play at specified time)</li>
-</ul>
-<p>To start Shuffletron, run the mixalot/example/shuffletron.sh script.</p>
-<!--  ----------------------------------------------------------------- -->
-
 <a name='future-work'></a><h2>Future Work</h2>
 
 <p>Various ideas for improvement, which might appear on an as-needed basis:</p>
 <ul>
-  <li>Support for Clozure Common Lisp</li>
   <li>Bindings to libvorbis, and a <tt>vorbis-streamer</tt></li>
+  <li>Interface to libsndfile</li>
   <li>Scheduled start times for streamers</li>
   <li>Refactor mixer into an audio sink and a mixing streamer, making submixes possible through the existing API.</li>
   <li>Protocol for insert effects (between streamer and mixer)</li>
-  <li>Interface to libsndfile</li>
   <li>Audio output for OSS or Mac OS X (patches welcome..)</li>
 </ul>
 

@@ -50,8 +50,8 @@ mpg123_handle pointer if successful."
     (unwind-protect
          (with-foreign-object (err :int)
            (setf uhandle (mpg123-new (null-pointer) err))
-           (mpg123-param uhandle :add-flags MPG123_QUIET 0.0d0)
            (check-mpg123-plain-error "mpg123-new" (mem-ref err :int))
+           (mpg123-param uhandle :add-flags MPG123_QUIET 0.0d0)
            (check-mh-error "Clear default formats" uhandle (mpg123-format-none uhandle))
            (check-mh-error "Configure output format" uhandle
              (mpg123-format uhandle output-rate 2 MPG123_ENC_SIGNED_16))
@@ -72,9 +72,11 @@ mpg123_handle pointer if successful."
   (with-slots (handle) mp3-stream
     (when handle
       (mpg123-close handle)
+      (mpg123-delete handle)
       (setf handle nil))))
 
 (defmethod streamer-cleanup ((stream mp3-streamer) mixer)
+  (declare (ignore mixer))
   (mp3-streamer-release-resources stream))
 
 (defun make-mp3-streamer
@@ -121,18 +123,18 @@ the file cannot be opened or another error occurs."
       (declare (type sample-vector read-buffer))
       (mixalot:with-array-pointer (bufptr read-buffer)
         (loop with end-output-index = (the array-index (+ offset length))
-              for tick upfrom 0
-              with output-index = offset 
-              while (< output-index end-output-index)
-              as chunk-size = (min max-buffer-length 
-                                   (- end-output-index output-index))
-              as err = (mpg123-read handle bufptr (* 4 chunk-size) nread)
-              as samples-read = (the array-index (ash (mem-ref nread 'mpg123::size_t) -2))
-              while (zerop err) do
-              #+NIL
-              (when (and (zerop err) (/= chunk-size samples-read))
-                (break "mpg123_read: Short read of ~:D (wanted ~:D)" 
-                       samples-read chunk-size))
+              with output-index = offset
+              with err = 0
+              with samples-read = 0
+              with chunk-size = 0
+              while (< output-index end-output-index) do 
+
+              (setf chunk-size (min max-buffer-length (- end-output-index output-index))
+                    err (mpg123-read handle bufptr (* 4 chunk-size) nread)
+                    samples-read (the array-index (ash (mem-ref nread 'mpg123::size_t) -2)))
+
+              (when (not (zerop err)) (loop-finish))
+              
               ;; Mix into buffer
               (loop for out-idx upfrom (the array-index output-index)
                     for in-idx upfrom 0
@@ -141,6 +143,7 @@ the file cannot be opened or another error occurs."
                                     (aref read-buffer in-idx)))
               (incf output-index samples-read)
               (incf (slot-value streamer 'position) samples-read)
+
               finally
               (cond
                 ((= err MPG123_DONE) ; End of stream.
@@ -151,25 +154,28 @@ the file cannot be opened or another error occurs."
                          (slot-value streamer 'filename)
                          err
                          (mpg123-strerror handle))
-                 (mixer-remove-streamer mixer streamer)
-                 #+NIL (check-mh-error "mpg123 read" handle err))))))))
+                 (mixer-remove-streamer mixer streamer))))))))
 
 ;;; Seek protocol
 
 (defmethod streamer-seekable-p ((stream mp3-streamer) mixer)
+  (declare (ignore mixer))
   (with-slots (length stream) stream
     (not (not length))))
 
 (defmethod streamer-length ((stream mp3-streamer) mixer)
+  (declare (ignore mixer))
   (with-slots (length) stream 
     length))
 
 (defmethod streamer-seek ((stream mp3-streamer) mixer position 
                           &key &allow-other-keys)
+  (declare (ignore mixer))
   (with-slots (seek-to sample-rate output-rate) stream
     (setf seek-to (floor (* sample-rate position) output-rate)))
   (values))
 
 (defmethod streamer-position ((stream mp3-streamer) mixer)
+  (declare (ignore mixer))
   (with-slots (position) stream
     position))
