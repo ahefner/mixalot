@@ -1,0 +1,20 @@
+@charset "utf-8";
+
+
+pre.lisp {
+    background: #eee;
+    margin: 10px 40px 10px 40px;
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+
+div.def {
+    margin-left: 2em;
+    margin-bottom: 1em;
+}
+
+div.docbody {
+    margin-left: 2em;
+    margin-right: 2em;
+}
+

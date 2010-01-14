@@ -1,0 +1,920 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+
+<html>
+<head>
+  <title>Mixalot User Manual</title>
+  <style type="text/css" title="currentStyle" media="screen">
+    @import "style.css";
+  </style>
+</head>
+
+<body>
+
+<h1>Mixalot User Manual</h1>
+
+<!-- Contents -->
+
+<h2>Table of Contents</h2>
+
+<ol>
+  <li><a href="#Introduction">Introduction</a></li>
+  <li><a href="#Installation">Installation</a></li>
+  <li><a href="#Portability">Portability</a></li>
+
+  <li><a href="#mixalot">System: mixalot</a>
+    <ul>
+      <li><a href="#mix_Introduction">Introduction</a></li>
+
+      <li><a href="#mix_Mixers">Mixers</a>
+      </li>
+
+      <li><a href="#mix_Streamers">Streamers</a>
+        <ul>
+          <li><a href="#mix_BasicStreamerProtocol">Basic Streamer Protocol</a></li>
+          <li><a href="#mix_PausingProtocol">Pausing Protocol</a></li>
+          <li><a href="#mix_SeekableProtocol">Seekable Protocol</a></li>
+        </ul>
+      </li>
+
+      <li><a href="#mix_VectorStreamers">Vector Streamers</a>
+
+      </li>
+      
+      <li><a href="#mix_SampleManipulation">Sample Manipulation</a>
+
+      </li>
+    </ul>
+  </li>
+
+  <li><a href="#mpg123-ffi">System: mpg123-ffi</a></li>
+  <li><a href="#mixalot-mp3">System: mixalot-mp3</a></li>
+  <li><a href="#shuffletron">Example: shuffletron</a></li>
+  <li><a href="#future-work">Future Work</a></li>
+</ol>
+
+<!-- Body Text -->
+
+<!--  ----------------------------------------------------------------- -->
+<h2><a name="Introduction"></a>Introduction</h2>
+
+<p>Mixalot is a grab bag of systems related to audio in Common
+Lisp. Currently it consists of a mixer component targeting the
+Advanced Linux Sound Architecture, a CFFI binding to the libmpg123
+library, and a system allowing playback of MP3 files through the
+mixer.</p>
+
+<!--  ----------------------------------------------------------------- -->
+<h2><a name="Installation"></a>Installation</h2>
+
+<p>The most recent version of Mixalot can be obtained from <a href="http://vintage-digital.com/hefner/software/mixalot/mixalot-current.tar.gz">http://vintage-digital.com/hefner/software/mixalot/mixalot-current.tar.gz</a>. 
+</p>
+
+<p>Mixalot includes several ASDF systems which should be symlinked into the ASDF central registry in the usual fashion. It depends directly on the following systems:</p>
+<ul>
+  <li>CFFI</li>
+  <li>bordeaux-threads</li>
+  <li>Alexandria</li>
+</ul>
+
+
+<!--  ----------------------------------------------------------------- -->
+<h2><a name="Portability"></a>Portability</h2>
+
+<p>The CFFI and bordeaux-threads libraries are used to ease porting
+between lisp implementations. The mixer component of Mixalot relies on
+ALSA and as such will only run on Linux systems. The mixer also relies
+on ability to obtain a foreign pointer to a lisp array, which CFFI
+does not provide, and this has only been implemented for SBCL so
+far. In order to be useful in an application, the mixer must also be
+run in its own thread. Therefore, the <tt>mixalot</tt>
+and <tt>mixalot-mp3</tt> systems are currently usable only on SBCL
+(with threads) under Linux. The <tt>mpg123-ffi</tt> system should be
+usable on any lisp that supports CFFI. Shuffletron, the music player
+example, additionally relies on the sb-posix library for filesystem
+access.
+</p>
+
+<!--  ----------------------------------------------------------------- -->
+<h2><a name="mixalot"></a>System: mixalot</h2>
+
+<h3><a name="mix_Introduction"></a>Introduction</h3>
+
+<p>Mixalot implements an audio mixer which handles the mixing of multiple
+audio streams and playback through ALSA. Once created, a mixer runs in
+its own thread of execution, and other threads can add and remove
+audio streamers at any time. The terms "stream" and "streamer" are
+used interchangeably here, but the concrete objects in the lisp system
+are labelled "streamers" to avoid confusion with the Common Lisp
+stream classes.</p>
+
+<p>All functions in this section reside in the <tt>mixalot</tt> package.</p>
+
+<h3><a name="mix_Mixers"></a>Mixers</h3>
+
+<p>A mixer is host to zero or more streamers. In the <tt>mixalot</tt>
+package, there are functions to create/destroy mixers, and add/remove
+streamers from a mixer.</p>
+
+
+<div class="def"><a name='create-mixer'>Function</a>
+                       <b>create-mixer</b> 
+ <i><tt>&amp;key</tt> (rate 44100)</i> &rArr; 
+ <i>mixer</i>
+ <div class="docbody">
+   <p>Creates a mixer running at the specified sampling <i>rate</i>,
+   and returns it. The default ALSA device is opened and a thread for
+   the mixer is started. The chosen sample <i>rate</i> should match
+   the sampling rate of the data you intend to play through the mixer - 
+   the Mixalot mixer does not perform resampling.</p>
+ </div>
+</div>
+
+<div class="def"><a name='destroy-mixer'>Function</a>
+                       <b>destroy-mixer</b> 
+ <i>mixer</i>
+ <div class="docbody">
+   <p>Requests that <i>mixer</i> be shut down. This will occur after
+   the current audio buffer has completed playback. When the mixer
+   shuts down, each of its streams will be removed just as
+   if <a href="#mixer-remove-streamer"><tt>mixer-remove-streamer</tt></a>
+   had been called, so it is not necessary to manually clean up the
+   streams when shutting down a mixer. Attempts to add additional
+   streamers to <i>mixer</i> after calling <tt>destroy-mixer</tt> on
+   it will result in an error.</p>
+ </div>
+</div>
+
+<div class="def"><a name='mixer-add-streamer'>Function</a>
+                       <b>mixer-add-streamer</b> 
+ <i>mixer streamer</i> &rArr;
+ <i>streamer start-time</i>
+ <div class="docbody">
+   <p>Add a <i>streamer</i> for playback by the
+   given <i>mixer</i>. After being added to the <i>mixer</i>, it will
+   begin calling the streamer functions
+   (see <a href="#mix_BasicStreamerProtocol">Basic Streamer
+   Protocol</a>) to generate samples.</p>
+   <p>Returns two values: the <i>streamer</i> itself, and the time in
+   samples since the start of the <i>mixer</i> when
+   the <i>streamer</i> will begin playback.</p>
+ </div>
+</div>
+
+<div class="def"><a name='mixer-remove-streamer'>Function</a>
+                       <b>mixer-remove-streamer</b>
+ <i>mixer streamer</i>
+ <div class="docbody">
+   <p>Request that <i>streamer</i> be from the <i>mixer</i>.
+   The <a href="#streamer-cleanup"><tt>streamer-cleanup</tt></a>
+   function will be called from within the mixer's thread when this
+   occurs. This occurs asynchronously because the stream may be
+   generating audio at the time this function is called, and it would
+   not be safe to clean it up until it is assured that the mixer will
+   not call the mix/write functions again.</p>
+ </div>
+</div>
+
+<div class="def"><a name='mixer-remove-all-streamers'>Function</a>
+                       <b>mixer-remove-all-streamers</b> 
+ <i>mixer</i>
+ <div class="docbody">
+   <p>Removes all streamers belonging to the <i>mixer</i>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mixer-current-time">Function</a>
+                       <b>mixer-current-time</b> 
+ <i>mixer</i> &rArr; <i>time</i>
+ <div class="docbody">
+   <p>Returns the <i>time</i>, measured in samples, since the mixer was created.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mixer-rate">Function</a>
+                       <b>mixer-rate</b> 
+ <i>mixer</i> &rArr; <i>rate</i>
+ <div class="docbody">
+   <p>Returns the sampling <i>rate</i> in Hertz of the output and inputs to the mixer. </p>
+ </div>
+</div>
+
+<h3><a name="mix_Streamers"></a>Streamers</h3>
+
+<p>A streamer is any object serving as a source of samples which are mixed into the mixer's audio
+buffer by implementing the <a href="#mix_BasicStreamerProtocol">Basic Streamer Protocol</a>.
+  From the mixer thread, the 
+functions <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>
+and <a href="#streamer-write-into"><tt>streamer-write-into</tt></a>
+are called periodically to generate audio. These two functions correspond to the cases of multiple or a single streamer being mixed, respectively, and it is only necessary to implement <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>.</p>
+
+<p>Defining a method on <a href="#streamer-write-into"><tt>streamer-write-into</tt></a> allows an optimization in the case where only one stream is being mixed into the buffer, where the streamer can (and is expected to) overwrite the specified range of the buffer rather than mixing with the existing audio. The default method on <a href="#streamer-write-into"><tt>streamer-write-into</tt></a> simply fills the specified range of the buffer to zero before calling <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>.
+
+<p>In many situations, a stream has only finite duration. In this situation, when the stream has reached its end, it can call <a href="#mixer-remove-streamer"><tt>mixer-remove-streamer</tt></a> from its write/mix method to remove itself from the mixer. This guarantees its mix/write methods will not be called again, and the mixer will call <a href="#streamer-cleanup"><tt>streamer-cleanup</tt></a> to ensure any resources associated with the streamer are released.</p>
+
+<p>The simplest example of a streamer is a function object taking the arguments of <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>. This is enabled by pre-existing methods on the streamer functions. Here is an example of a streamer implemented as a lambda function which produces a series of six tones with increasing frequency, then removes itself from the mixer:</p> <pre class="lisp">
+(defun make-test-streamer ()
+  (let ((n 0)
+        (phase 0.0))
+    (lambda (streamer mixer buffer offset length time)
+      (declare (ignore time))
+      (loop for index upfrom offset
+            repeat length
+            with freq = (+ 200 (* n 200))
+            with dp = (* 2.0 pi freq 1/44100)
+            as sample = (round (* 5000 (sin phase)))
+            do            
+            (mixalot:stereo-incf (aref buffer index) (mixalot:mono->stereo sample))
+            (incf phase dp))
+      (incf n)
+      (when (= n 6)
+        (mixalot:mixer-remove-streamer mixer streamer)))))
+</pre>
+
+<p>Here is an example of how to create a mixer and play the test streamer defined above:</p>
+
+<pre class="lisp">
+CL-USER> (defparameter *mixer* (mixalot:create-mixer))
+*MIXER*
+CL-USER> (mixer-add-streamer *mixer* (make-test-streamer))
+#&lt;CLOSURE (LAMBDA (STREAMER MIXER BUFFER ...)) {1003F045A9}&gt;
+507904
+CL-USER> 
+</pre>
+
+<p>Here is the same streamer, implemented via classes and methods:</p>
+
+<pre class="lisp">
+(defclass test-streamer ()
+  ((n     :initform 0)
+   (phase :initform 0.0)))   
+
+(defmethod mixalot:streamer-mix-into ((streamer test-streamer) mixer buffer offset length time)
+  (declare (ignore time))
+  (with-slots (n phase) streamer
+    (loop for index upfrom offset
+          repeat length
+          with freq = (+ 200 (* n 200))
+          with dp = (* 2.0 pi freq 1/44100)
+          as sample = (round (* 5000 (sin phase)))
+          do            
+          (mixalot:stereo-incf (aref buffer index) (mixalot:mono->stereo sample))
+          (incf phase dp))
+    (when (= (incf n) 6)
+      (mixalot:mixer-remove-streamer mixer streamer))))
+</pre>
+
+<h4><a name="mix_BasicStreamerProtocol"></a>Basic Streamer Protocol</h4>
+
+<p>These generic functions define the essential behaviors of an audio streamer. Of them, only <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a> is mandatory to implement.</p>
+
+<div class="def"><a name="streamer-mix-into">Generic Function</a>
+                       <b>streamer-mix-into</b> 
+ <i>streamer mixer buffer offset length time</i>
+ <div class="docbody">
+   <p>Generate <i>length</i> samples of audio from <i>streamer</i>. 
+    The audio should be mixed into the provided <i>buffer</i> (of type
+   <a href="#sample-vector"><tt>sample-vector</tt></a>) starting from <i>offset</i>. 
+   <i>Time</i> indicates the time in samples since the creation of the <i>mixer</i>.</p>
+   <p>The provided <a href="#mix-stereo-samples"><tt>mix-stereo-samples</tt></a> function
+   or <a href="#stereo-mixf"><tt>stereo-mixf</tt></a> macro can be used for mixing samples.</p>
+   <p>When a <i>streamer</i> has completed playback, it can call
+   <a href="#mixer-remove-streamer"><tt>mixer-remove-streamer</tt></a>
+   after generating its last batch of audio to remove itself from the <i>mixer</i>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="streamer-write-into">Generic Function</a>
+                       <b>streamer-write-into</b> 
+ <i>streamer mixer buffer offset length time</i>
+ <div class="docbody">
+   <p>Generate <i>length</i> samples of audio from <i>streamer</i>. 
+   The contents of <i>buffer</i> (of type <a href="#sample-vector"><tt>sample-vector</tt></a>) 
+   may be invalid and must be overwritten (not mixed into) starting from <i>offset</i>.
+   This method exists as an optimization for the case of the first or only playing streamer,
+   to avoid redundant zero-filling of the <i>buffer</i> and unnecessary mixing. The default
+   method fills the buffer with zeros then calls <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>,
+   so implementing a more specific method for this is optional.    
+   <i>Time</i> indicates the time in samples since the creation of the <i>mixer</i></p>
+   <p>When a <i>streamer</i> has completed playback, it can call
+   <a href="#mixer-remove-streamer"><tt>mixer-remove-streamer</tt></a>
+   after generating its last batch of audio to remove itself from the <i>mixer</i>.</p>
+ </div>
+</div>
+
+
+<div class="def"><a name="streamer-cleanup">Generic Function</a>
+                       <b>streamer-cleanup</b> 
+ <i>streamer mixer</i>
+ <div class="docbody">
+   <p>Notification that <i>streamer</i> has been removed from the <i>mixer</i>, and its streamer
+   functions will not be called again. This allows the <i>streamer</i> to release resources
+   no longer needed, such as open file handles or foreign memory.</p>
+ </div>
+</div>
+
+
+<h4><a name="mix_PausingProtocol"></a>Pausing Protocol</h4>
+
+<p>Streamers are inherently pauseable, achieved by the mixer electing not to call on them to
+   generate audio while they are paused (the mixer tracks the paused/playing state itself).
+   Therefore, most streamers will have no reason to define more specific methods on these
+   functions. A counterexample might be a streamer streaming audio over the network, which
+   may want to adjust its buffering behavior when the stream is paused and unpaused.
+</p>
+
+<div class="def"><a name="streamer-pause">Generic Function</a>
+                       <b>streamer-pause</b>
+ <i>streamer mixer</i>
+ <div class="docbody">
+  <p>Pause playback of the <i>streamer</i> through the <i>mixer</i>. If <i>streamer</i> is already paused, it remains paused.</p>
+ </div>
+</div>
+
+
+<div class="def"><a name="streamer-unpause">Generic Function</a>
+                       <b>streamer-unpause</b> 
+ <i>streamer mixer</i>
+ <div class="docbody">
+  <p>Unpause playback of the <i>streamer</i> through the <i>mixer</i>. If <i>streamer</i> is already playing, it continues to play.</p>
+ </div>
+</div>
+
+
+<div class="def"><a name="streamer-paused-p">Generic Function</a>
+                       <b>streamer-paused-p</b> 
+ <i>streamer mixer</i> &rArr; 
+ <i>boolean</i>
+ <div class="docbody">
+ <p>Returns true if playback of the <i>streamer</i> through the <i>mixer</i> is currently paused.</p>
+ </div>
+</div>
+
+
+<h4><a name="mix_SeekableProtocol"></a>Seekable Protocol</h4>
+
+<p>Some streamers may have the ability to seek to an offset during 
+playback. These streamers must implement the Seekable protocol, 
+comprised of the functions below. Users can call these functions to 
+control and query stream position and length.
+</p>
+
+<div class="def"><a name="streamer-seekable-p">Generic Function</a>
+                       <b>streamer-seekable-p</b>
+ <i>streamer mixer</i> &rArr; 
+ <i>boolean</i>
+ <div class="docbody">
+   <p>Returns true is the <i>streamer</i> is seekable. Attempting to
+   seek or query the stream length or position may signal an error
+   unless this returns true.</p>
+ </div>
+</div>
+
+<div class="def"><a name="streamer-length">Generic Function</a>
+                       <b>streamer-length</b> 
+ <i>streamer mixer</i> &rArr; 
+ <i>length-or-nil</i>
+ <div class="docbody">
+  <p>Returns the length, in samples, of the <i>streamer</i>. If this
+  can not be determined, returns nil.</p>
+ </div>
+</div>
+
+<div class="def"><a name="streamer-seek">Generic Function</a>
+                       <b>streamer-seek</b>
+ <i>streamer mixer position <tt>&amp;key &amp;allow-other-keys</tt></i>
+ <div class="docbody">
+   <p>Seek to a <i>position</i>, measured in samples,
+   on <i>streamer</i>. Streamers are permitted to seek approximately
+   (for instance, rounding to the nearest frame of compressed
+   data). Specific streamer types may take additional arguments.</p>
+   <p><b>Issue:</b> Should this return a boolean indicated success/failure?
+   It's feasible that on compressed or network streams, it might not
+   always be possible to seek at all, or the circumstances in which it
+   may fail may be subtle. On the other hand, these streams could always
+   roll their own protocol using the condition system.</p>
+ </div>
+</div>
+
+<div class="def"><a name="streamer-position">Generic Function</a>
+                       <b>streamer-position</b>
+ <i>stream mixer</i> &rArr;
+ <i>position</i>
+ <div class="docbody">
+ <p>Returns the <i>position</i>, measured in samples, of playback within the <i>streamer</i>.</p>
+ </div>
+</div>
+
+
+<h3><a name="mix_VectorStreamers"></a>Vector Streamers</h3>
+
+<p>Several classes are provided for streaming audio directly from a
+lisp vector in memory. These vary in input format and come in regular
+and fast variants, where the fast version assumes the input vector is
+an appropriately specialized <tt>simple-array</tt>.  The following
+functions construct these streamers:
+</p>
+
+<div class="def"><a name="make-vector-streamer-mono">Function</a>
+                       <b>make-vector-streamer-mono</b> 
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming 16-bit mono audio from
+  a range of <i>vector</i> defined by <i>start</i> and <i>end</i>.</p> 
+ </div>
+</div>
+
+<div class="def"><a name="make-fast-vector-streamer-mono">Function</a>
+                       <b>make-fast-vector-streamer-mono</b> 
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming 16-bit mono audio from
+  a range of <i>vector</i> defined by <i>start</i> and <i>end</i>. 
+  <i>Vector</i> is assumed to be of type <tt>(simple-array (signed-byte 16) 1)</tt>.</p> 
+ </div>
+</div>
+
+
+<div class="def"><a name="make-vector-streamer-interleaved-stereo">Function</a>
+                       <b>make-vector-streamer-interleaved-stereo</b> 
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
+  from a range of <i>vector</i> defined by <i>start</i>
+  and <i>end</i>. Samples are read in an interleaved format with
+  separate array elements for the left and right channels, such that
+  one output sample corresponds to two input elements.
+  </p>
+ </div>
+</div>
+
+<div class="def"><a name="make-fast-vector-streamer-interleaved-stereo">Function</a>
+                       <b>make-fast-vector-streamer-interleaved-stereo</b> 
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
+  from a range of <i>vector</i> defined by <i>start</i>
+  and <i>end</i>. Samples are read in an interleaved format with
+  separate array elements for the left and right channels, such that
+  one output sample corresponds to two input elements.
+  <i>Vector</i> is assumed to be of type <tt>(simple-array (signed-byte 16) 1)</tt>.
+  </p>
+ </div>
+</div>
+
+
+<div class="def"><a name="make-vector-streamer-joint-stereo">Function</a>
+                       <b>make-vector-streamer-joint-stereo</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
+  in joint format (see <a href="#stereo-sample"><tt>stereo-sample</tt></a>) from a
+  range of <i>vector</i> defined by <i>start</i> and <i>end</i>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="make-fast-vector-streamer-joint-stereo">Function</a>
+                       <b>make-fast-vector-streamer-joint-stereo</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
+  in joint format (see <a href="#stereo-sample"><tt>stereo-sample</tt></a>) from a
+  range of <i>vector</i> defined by <i>start</i> and <i>end</i>.
+  <i>Vector</i> is assumed to be of type <a href="#sample-vector"><tt>sample-vector</tt></a>.
+  </p>
+ </div>
+</div>
+
+
+
+<h3><a name="mix_SampleManipulation"></a>Sample Manipulation</h3>
+
+<p> For simplicity, Mixalot deals uniformly in 16-bit stereo audio,
+but the sampling rate may vary. The following type definitions relate
+to samples and audio buffers:</p>
+
+<div class="def"><a name="mono-sample">Type</a>
+                       <b>mono-sample</b> 
+ <div class="docbody">
+<pre>(deftype mono-sample () 
+  '(or (signed-byte 16)
+       (unsigned-byte 16)))</pre>
+ <p>A mono sample is typically represented as a <tt>(signed-byte
+ 16)</tt>. Occasionally, it is convenient to use an unsigned
+ representation instead.
+ </div>
+</div>
+
+<div class="def"><a name='stereo-sample'>Type</a>
+                       <b>stereo-sample</b> 
+ <div class="docbody">
+   <pre>(deftype stereo-sample () '(unsigned-byte 32))</pre>
+   <p>This is the native representation of audio in Mixalot. Two
+   16-bit samples are combined into a single word, with the left
+   channel stored in the low word and the right channel stored in the
+   high word.</p>
+ </div>
+</div>
+
+<div class="def"><a name='sample-vector'>Type</a>
+                       <b>sample-vector</b> 
+ <div class="docbody">
+   <pre>(deftype sample-vector () '(simple-array stereo-sample 1))</pre>     
+   <p>The <tt>sample-vector</tt> type denotes specialized one-dimensional simple-arrays of stereo samples.</p>
+ </div>
+</div>
+
+
+<p>Various functions are available for manipulating samples. All of
+the following functions are declared inline, with appropriately
+declared types, and compiled to reasonably efficient code at the time
+of this writing (using SBCL 1.0.28.27/x86_64).</p>
+
+
+<div class="def"><a name="stereo-sample">Function</a>
+                       <b>stereo-sample</b> 
+ <i>left right</i> &rArr; <i>sample</i>
+ <div class="docbody">
+   <p>Construct a <a href="#stereo-sample"><tt>stereo-sample</tt></a> 
+     from separate <i>left</i> and <i>right</i> components, each
+     a <a href="#mono-sample"><tt>mono-sample</tt></a>.
+ </div>
+</div>
+
+<div class="def"><a name="mono->stereo">Function</a>
+                       <b>mono->stereo</b> 
+ <i>mono-sample</i> &rArr; <i>stereo-sample</i>
+ <div class="docbody">
+   <p>Expand a <a href="#mono-sample"><tt>mono-sample</tt></a> to
+   a <a href="#stereo-sample"><tt>stereo-sample</tt></a> by
+   duplicating it on the left and right channel.
+   </p>
+ </div>
+</div>
+
+<div class="def"><a name="stereo-left">Function</a>
+                       <b>stereo-left</b> 
+ <i>stereo-sample</i> &rArr; <i>left</i>
+ <div class="docbody">
+   <p>Returns the <i>left</i> channel component of a <a href="#stereo-sample"><tt>stereo-sample</tt></a>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="stereo-right">Function</a>
+                       <b>stereo-right</b> 
+ <i>stereo-sample</i> &rArr; <i>right</i>
+ <div class="docbody">
+   <p>Returns the <i>right</i> channel component of a <a href="#stereo-sample"><tt>stereo-sample</tt></a>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="split-sample">Function</a>
+                       <b>split-sample</b> 
+ <i>stereo-sample</i> &rArr; <i>left right</i>
+ <div class="docbody">
+   <p>Returns two values, the <i>left</i> and <i>right</i> components
+   of a <a href="#stereo-sample"><tt>stereo-sample</tt></a>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="clamp-sample">Function</a>
+                       <b>clamp-sample</b>
+ <i>integer</i> &rArr; <i>mono-sample</i>
+ <div class="docbody">
+   <p>Clamp an <i>integer</i> to the range -32,768...32,767.</p>
+ </div>
+</div>
+
+<div class="def"><a name="clamp-sample+">Function</a>
+                       <b>clamp-sample+</b>
+ <i>x y</i> &rArr; <i>sum</i>
+ <div class="docbody">
+   <p>Compute the <i>sum</i> of integers <i>x</i> and <i>y</i>, clamped to the range -32,768...32,767.</p>
+ </div>
+</div>
+
+<div class="def"><a name="add-stereo-samples">Function</a>
+                       <b>add-stereo-samples</b> 
+ <i>x y</i> &rArr; <i>unclamped-sum</i>
+ <div class="docbody">
+   <p>Returns the pairwise sum of the <a href="#stereo-sample"><tt>stereo-samples</tt></a>
+   <i>x</i> and <i>y</i>, without clipping. The sums of the individual channels may wrap, 
+   but will not overflow into the other channel.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mix-stereo-samples">Function</a>
+                       <b>mix-stereo-samples</b>
+ <i>x y</i> &rArr; <i>clamped-sum</i>
+ <div class="docbody">
+   <p>Returns the pairwise sum of the <a href="#stereo-sample"><tt>stereo-samples</tt></a>
+   <i>x</i> and <i>y</i>, clamped to -32,768...32,767.</p>
+ </div>
+</div>
+
+<div class="def"><a name="stereo-incf">Macro</a>
+                       <b>stereo-incf</b> 
+ <i>place sample</i> &rArr; <i>sum</i>
+ <div class="docbody">
+   <p>Increment the contents of <i>place</i> (a <a href="#stereo-sample"><tt>stereo-sample</tt></a>)
+   by <i>sample</i> as if by <a href="#add-stereo-samples"><tt>add-stereo-samples</tt></a>.
+   </p>
+ </div>
+</div>
+
+<div class="def"><a name="stereo-mixf">Macro</a>
+                       <b>stereo-mixf</b>
+ <i>place sample</i> &rArr; <i>sum</i>
+ <div class="docbody">
+   <p>Increment the contents of <i>place</i> (a <a href="#stereo-sample"><tt>stereo-sample</tt></a>)
+   by <i>sample</i> as if by <a href="#mix-stereo-samples"><tt>mix-stereo-samples</tt></a>.
+   </p>
+ </div>
+</div>
+
+
+<!--  ----------------------------------------------------------------- -->
+<h2><a name="mpg123-ffi"></a>System: mpg123-ffi</h2>
+
+<p>The <tt>mpg123-ffi</tt> system presents a thin wrapper around
+libmpg123 and should, given the source code, be self explanatory in
+combination with the original <a href="http://www.mpg123.de/api/">libmpg123
+documentation</a>. It provides bindings to most of the API, excluding
+the advanced parameters API and a few functions dealing with
+feeding MPEG frames directly into the decoder (and patches for these
+are welcome).</p>
+
+<!-- I could write real docs for the FFI definitions, but it would
+most be a mechanical translation of CFFI definitions and comments to
+pretty HTML. -->
+
+<p>It also manages library initialization and provides helper
+functions for retrieving ID3 tags and decoding MP3 files. The ID3
+decoding is intended to be robust in the face of badly formed or
+encoded input common in MP3 files, and failure to do so should be
+reported as a bug.
+</p>
+
+<p>The functions are exported from the <tt>mpg123</tt> package and
+comprise a thin wrapper in the sense that most of the C functions are
+exported directly with no extra lisp wrapper. A few exceptions
+involving out parameters and other awkward idioms are wrapped to use
+multiple return values instead; only these are documented explicitly
+below. For all other functions, see <tt>mpg123.lisp</tt>.
+</p>
+
+
+<div class="def"><a name="ensure-library-initialized">Function</a>
+                       <b>ensure-library-initialized</b>
+ <div class="docbody">
+   <p>Ensures that the libmpg123 has been initialized.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mpg123-error">Condition</a>
+                       <b>mpg123-error</b>
+ <div class="docbody">
+   <p>An error from the mpg123 library.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mpg123-handle-error">Condition</a>
+                       <b>mpg123-handle-error</b> 
+ (inherits from <a href="#mpg123-error"><tt>mpg123-error</tt></a>)
+ <div class="docbody">
+   <p>An error from the mpg123 library in the context of a handle.</p>
+ </div>
+</div>
+
+<div class="def"><a name="check-mpg123-plain-error">Function</a>
+                       <b>check-mpg123-plain-error</b> 
+ <i>circumstance code</i>
+ <div class="docbody">
+   <p>Examines the <i>code</i> returned by a call to libmpg123 (excluding
+   those functions which act on handles). If it indicates an error, it
+   translates the error to a descriptive string and signals an error of
+   type <a href="#mpg123-error"><tt>mpg123-error</tt></a>. <i>Circumstance</i>
+   is a string, included in the error report, intended to indicate which
+   library call produced the error or what the programmer was attempting to do.
+   </p>
+ </div>
+</div>
+
+<div class="def"><a name="check-mh-error">Function</a>
+                       <b>check-mh-error</b> 
+ <i>circumstance handle value</i>
+ <div class="docbody">
+   <p>Examines the <i>value</i> returned by a call (in the context of the mpg123_handle pointer <i>handle</i>)
+   to libmpg123. If it indicates an error, it translates the error to a descriptive string and signals an error of
+   type <a href="#mpg123-handle-error"><tt>mpg123-handle-error</tt></a>. <i>Circumstance</i>
+   is a string, included in the error report, intended to indicate which
+   library call produced the error or what the programmer was attempting to do. 
+   If no error occurred, <i>value</i> is returned.
+   </p>
+ </div>
+</div>
+
+
+<div class="def"><a name="mpg123-decoders">Function</a>
+                       <b>mpg123-decoders</b> 
+ &rArr; <i>decoders</i>
+ <div class="docbody">
+   <p>Returns a list of generally available <i>decoders</i>.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mpg123-supported-decoders">Function</a>
+                       <b>mpg123-supported-decoders</b> 
+ &rArr; <i>decoders</i>
+ <div class="docbody">
+   <p>Returns a list of <i>decoders</i> supported by the CPU.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mpg123-getformat">Function</a>
+                       <b>mpg123-getformat</b> 
+ <i>handle</i> &rArr; <i>rate channels encoding</i>
+ <div class="docbody">
+   <p>Given a <i>handle</i> with an opened file, returns three
+   values indicating the current format: <i>rate</i> (in
+   Hertz), <i>channels</i> (1 or 2), and <i>encoding</i> (an integer, one
+   of <tt>MPG123_ENC_</tt>... constants).
+   </p>
+ </div>
+</div>
+
+<h3>Helpers</h3>
+
+<div class="def"><a name="get-tags-from-handle">Function</a>
+                       <b>get-tags-from-handle</b>
+ <i>handle</i> &rArr; <i>plist</i>
+ <div class="docbody">
+   <p>Examines ID3v1 and ID3v2 tags from an mpg123 <i>handle</i>,
+   returning a <i>plist</i> containing a subset of the following keys:</p>
+     <ul>
+       <li><tt>:title</tt> </li>
+       <li><tt>:artist</tt> </li>
+       <li><tt>:album</tt> </li>
+       <li><tt>:year</tt> </li>
+       <li><tt>:comment</tt> </li>
+       <li><tt>:genre</tt> </li>
+       <li><tt>:track</tt> </li>
+     </ul>
+     <p>For all keys except <tt>:track</tt>, the property value will
+     be a string. If <tt>:track</tt> is present, it will be an
+     integer.</p>
+     <p>Prefers taking values from ID3v2 tags, but falls back to the
+     ID3v1 tag when necessary.  Some heuristics are applied to correct
+     or reject obviously incorrect property values. Specifically,
+     various forms of year are canonicalized to a four-digit form if a
+     reasonable guess can be made, and track numbers of zero are
+     removed from the <i>plist</i>.</p>
+     <p><b>Issue:</b> Currently only extracts track numbers from the
+     ID3v2 <tt>TRCK</tt> field, but should definitely fall back to the
+     ID3v1.1 track number field if this is not present.</p>
+ </div>
+</div>
+
+
+<div class="def"><a name="get-tags-from-file">Function</a>
+                       <b>get-tags-from-file</b> 
+ <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
+ <div class="docbody">
+   <p>Open an MP3 file, examine its tags
+      using <a href="#get-tags-from-handle">get-tags-from-handle</a>,
+      and return the resulting <i>plist</i>.</p>
+   <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
+      <tt>(latin-1)</tt> before being passed to C; to avoid encoding
+      problems on non-ASCII filenames, it is recommended you obtain
+      the <i>filename</i> string with this in mind. You can change this
+      behavior using the <tt>:character-encoding</tt> keyword, which can take any valid
+      <a href="http://common-lisp.net/project/babel/">Babel</a> encoding specifier
+      (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice 
+      should be congruent with how the string was obtained from the filesystem).
+   </p>
+ </div>
+</div>
+
+<div class="def"><a name="decode-mp3-file">Function</a>
+                       <b>decode-mp3-file</b>
+ <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i> &rArr; <i>vector rate channels encoding</i>
+ <div class="docbody">
+   <p>Opens and decodes an MP3 file, returning a <i>vector</i> of
+   samples, a <tt>(simple-array (signed-byte 16) 1)</tt>, interleaved, with one array 
+   element per channel.
+   The <tt>:character-encoding</tt> keyword chooses how the <i>filename</i> is encoded as a C string.
+   Additionally, the <i>rate</i>, <i>channels</i>, and <i>encoding</i> () of the file are returned (see <a href="#mpg123-getformat">mpg123-getformat</a>).
+   </p>
+ </div>
+</div>
+
+<!--  ----------------------------------------------------------------- -->
+<h2><a name="mixalot-mp3"></a>System: mixalot-mp3</h2>
+
+<p>The <tt>mixalot-mp3</tt> system builds on mpg123-ffi to implement a
+seekable streamer class for use with the mixer, allowing incremental
+decoding and playback of MP3 files from disk. The following functions
+reside in the <tt>mixalot-mp3</tt> package:</p>
+
+<div class="def"><a name="mp3-streamer">Class</a>
+                       <b>mp3-streamer</b> 
+ <div class="docbody">
+   <p>A seekable Mixalot streamer for playing MP3 files.</p>
+ </div>
+</div>
+
+<div class="def"><a name="make-mp3-streamer">Function</a>
+                       <b>make-mp3-streamer</b> 
+ <i>filename <tt>&amp;rest</tt> args <tt>&amp;key</tt> (output-rate 44100) (class 'mp3-streamer) <tt>&amp;allow-other-keys</tt></i>
+ <br> &rArr; <i>mp3-streamer</i>
+ <div class="docbody">
+   <p>Create and return an <i>mp3-streamer</i> which opens and
+   incrementally decodes from the given <i>filename</i>.  If the file
+   cannot be opened, an error of
+   type <a href="#mpg123-handle-error"><tt>mpg123-handle-error</tt></a>
+   is signalled.  The output is resampled according
+   to <i>output-rate</i>, which for correct playback should match the
+   rate of the mixer the stream will be used with.
+  </p>
+
+   <p>The <i>class</i> argument allows specifying an alternate class
+   to <tt>make-instance</tt>. This class must be a subclass
+   of <a href="#mp3-streamer"><tt>mp3-streamer</tt></a>. Remaining <i>args</i>
+   and <i>output-rate</i> are passed to <tt>make-instance</tt> as
+   initargs.</p>
+
+   <p><b>Note:</b> While libmpg123 can perform automatic resampling,
+   the resulting audio quality is very poor, and in practice you
+   shouldn't do it. ALSA's dmix does a much better job, although
+   resampling through dmix has its own issues (namely,
+   unpredictable and often unreasonably high CPU usage when more than
+   one program uses the device simultaneously).
+ </div>
+</div>
+
+<div class="def"><a name="mp3-streamer-release-resources">Function</a>
+                       <b>mp3-streamer-release-resources</b> 
+ <i>mp3-streamer</i>
+ <div class="docbody">
+   <p>Release foreign resources held by the <i>mp3-streamer</i>. In
+   normal operation, <a href="#streamer-cleanup"><tt>streamer-cleanup</tt></a>
+   calls this automatically when the streamer is removed from its
+   mixer. It's only necessary to call this yourself if
+   the <i>mp3-streamer</i> has never been added to a mixer, but you
+   want to dispose of it.</p>
+ </div>
+</div>
+
+<div class="def"><a name="mp3-sample-rate">Function</a>
+                       <b>mp3-sample-rate</b> 
+ <i>mp3-streamer</i> &rArr; <i>rate</i>
+ <div class="docbody">
+   <p>Returns the native sampling <i>rate</i> of the file behind an <i>mp3-streamer</i>. This may be different from the output sampling rate.</p>
+ </div>
+</div>
+
+<p>Example of creating and playing an MP3 stream:</p>
+<pre class='lisp'>
+CL-USER> (mixalot:mixer-add-streamer *mixer* 
+           (mixalot-mp3:make-mp3-streamer "/home/hefner/test.mp3"))
+#&lt;MIXALOT-MP3:MP3-STREAMER {10029B9A91}&gt;
+8463564800
+</pre>
+
+<!--  ----------------------------------------------------------------- -->
+
+<a name='shuffletron'></a><h2>Example: Shuffletron</h2>
+<p>Shuffletron is an MP3 player with a textual interface, and an example program using the Mixalot systems. It requires Linux and SBCL with threads, and the <a href="http://utopia.knoware.nl/~hlub/rlwrap/man.html">rlwrap</a> program is strongly recommended. It has the following features:</p>
+<ul>
+  <li>MP3 playback</li>
+  <li>Simple, rapid searching of music files</li>
+  <li>Queueing of files, with shuffle and looping mode</li>
+  <li>Alarm clock mode (unpause/play at specified time)</li>
+</ul>
+<p>To start Shuffletron, run the mixalot/example/shuffletron.sh script.</p>
+<!--  ----------------------------------------------------------------- -->
+
+<a name='future-work'></a><h2>Future Work</h2>
+
+<p>Various ideas for improvement, which might appear on an as-needed basis:</p>
+<ul>
+  <li>Support for Clozure Common Lisp</li>
+  <li>Bindings to libvorbis, and a <tt>vorbis-streamer</tt></li>
+  <li>Scheduled start times for streamers</li>
+  <li>Refactor mixer into an audio sink and a mixing streamer, making submixes possible through the existing API.</li>
+  <li>Protocol for insert effects (between streamer and mixer)</li>
+  <li>Interface to libsndfile</li>
+  <li>Audio output for OSS or Mac OS X (patches welcome..)</li>
+</ul>
+
+<p>Report bugs to Andy Hefner <i>&lt;ahefner at gmail dot com&gt;</i></p>
+
+<!--  ----------------------------------------------------------------- -->
+
+</body>
+</html>
