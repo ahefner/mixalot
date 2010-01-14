@@ -1,0 +1,4 @@
+* Changes in mixalot-0.0.2 relative to mixalot-0.0.2a:
+** Bug fix: Couldn't find libmpg123 or libasound when only installed in /usr/local/lib/ (Isn't CFFI supposed to do the right thing with library search paths? It doesn't.)
+
+
