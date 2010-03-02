@@ -148,17 +148,17 @@
 (defcfun sf-format-check :int (info SF_INFO*))
 
 ;;; Seek within waveform data. 'whence' is as with fseek.
-(defcfun sf_seek sf_count_t
+(defcfun sf-seek sf_count_t
   (sndfile SNDFILE*)
   (num-frames sf_count_t)
   (whence :int))
 
-(defcfun sf_set_string :int
+(defcfun sf-set-string :int
   (sndfile SNDFILE*)
   (str_type :int)
   (string :string))
 
-(defcfun sf_get_string :string
+(defcfun sf-get-string :string
   (sndfile SNDFILE*)
   (str_type :int))
 
