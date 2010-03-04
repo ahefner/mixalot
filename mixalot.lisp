@@ -208,7 +208,7 @@
             "PCM set parameters"
             (snd-pcm-set-params
              pcm :snd-pcm-format-s16-le :snd-pcm-access-rw-interleaved
-             2 rate 1 100000))
+             2 rate 1 300000))
            (funcall continuation pcm))
       (snd-pcm-close pcm))))
 
@@ -473,7 +473,6 @@
      (streamer-cleanup streamer mixer))
    (clrhash (mixer-stream-state mixer))
    (setf (mixer-stream-list mixer) nil)))
-
 
 (defun create-mixer (&key (rate 44100))
   "Create a new mixer at the specified sample rate, running in its own thread."
