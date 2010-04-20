@@ -41,7 +41,7 @@
    (position  :initform 0)
    (seek-to   :initform nil)))
 
-(defun open-mp3-file (filename &key (output-rate 44100))
+(defun open-mp3-file (filename &key (output-rate 44100) (prescan t))
   "Open an MP3 file from disk, forcing the output format to 16 bit,
 stereo, resampling to the requested rate, and returning an
 mpg123_handle pointer if successful."
@@ -62,7 +62,8 @@ mpg123_handle pointer if successful."
            ;; The library wants see the stream format before we begin decoding.
            (setf rate (mpg123-getformat uhandle))
 
-           (check-mh-error "Prescan stream" uhandle (mpg123-scan uhandle))
+           (when prescan
+             (check-mh-error "Prescan stream" uhandle (mpg123-scan uhandle)))
            (rotatef handle uhandle))
       (when uhandle (mpg123-close uhandle)))
     (values handle rate)))
@@ -80,15 +81,21 @@ mpg123_handle pointer if successful."
   (mp3-streamer-release-resources stream))
 
 (defun make-mp3-streamer
-    (filename &rest args &key (output-rate 44100) (class 'mp3-streamer) &allow-other-keys)
-  "Create an mp3 audio stream from a file, raising an mpg123-error if 
+    (filename &rest args 
+     &key 
+     (output-rate 44100)
+     (class 'mp3-streamer)
+     (prescan t)
+     &allow-other-keys)
+  "Create an mp3 audio stream from a file, raising an mpg123-error if
 the file cannot be opened or another error occurs."
   (multiple-value-bind (handle sample-rate)
-      (open-mp3-file filename :output-rate output-rate)
+      (open-mp3-file filename :output-rate output-rate :prescan prescan)
     (remf args :class)
+    (remf args :prescan)
     (let ((stream (apply #'make-instance 
-                         class 
-                         :handle handle
+                         class
+                         :handle handle                         
                          :sample-rate sample-rate
                          :output-rate output-rate
                          'filename filename

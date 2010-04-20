@@ -836,8 +836,8 @@ reside in the <tt>mixalot-mp3</tt> package:</p>
 </div>
 
 <div class="def"><a name="make-mp3-streamer">Function</a>
-                       <b>make-mp3-streamer</b> 
- <i>filename <tt>&amp;rest</tt> args <tt>&amp;key</tt> (output-rate 44100) (class 'mp3-streamer) <tt>&amp;allow-other-keys</tt></i>
+                       <b>make-mp3-streamer</b>
+ <i>filename <tt>&amp;rest</tt> args <tt>&amp;key</tt> (output-rate 44100) (class 'mp3-streamer) (prescan t) <tt>&amp;allow-other-keys</tt></i>
  <br> &rArr; <i>mp3-streamer</i>
  <div class="docbody">
    <p>Create and return an <i>mp3-streamer</i> which opens and
@@ -847,7 +847,7 @@ reside in the <tt>mixalot-mp3</tt> package:</p>
    is signalled.  The output is resampled according
    to <i>output-rate</i>, which for correct playback should match the
    rate of the mixer the stream will be used with.
-  </p>
+   </p>
 
    <p>The <i>class</i> argument allows specifying an alternate class
    to <tt>make-instance</tt>. This class must be a subclass
@@ -855,12 +855,14 @@ reside in the <tt>mixalot-mp3</tt> package:</p>
    and <i>output-rate</i> are passed to <tt>make-instance</tt> as
    initargs.</p>
 
+   <p>In order to ensure that the file length is correct and enable accurate seeking, it is recommended to scan through the MP3 file before beginning playback. This may result in a noticeable delay while the file is scanned.  The <i>prescan</i> argument controls whether this prescanning occurs. By default, prescanning is enabled.</p>
+
    <p><b>Note:</b> While libmpg123 can perform automatic resampling,
    the resulting audio quality is very poor, and in practice you
    shouldn't do it. ALSA's dmix does a much better job, although
    resampling through dmix has its own issues (namely,
    unpredictable and often unreasonably high CPU usage when more than
-   one program uses the device simultaneously).
+   one program uses the device simultaneously).</p>
  </div>
 </div>
 
