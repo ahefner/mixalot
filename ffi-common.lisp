@@ -6,7 +6,9 @@
            #:SEEK_SET
            #:SEEK_CUR
            #:SEEK_END
-           #:memset))
+           #:memset
+           #:valid-pointer
+           #:validate-pointer))
 
 (in-package :mixalot-ffi-common)
 
@@ -27,7 +29,6 @@
 
 (defctype loff_t :long-long)
 
-
 (defconstant SEEK_SET 0)
 (defconstant SEEK_CUR 1)
 (defconstant SEEK_END 2)
@@ -36,3 +37,9 @@
   (ptr :pointer)
   (constant :int)
   (size size_t))
+
+(defun valid-pointer (ptr) (unless (null-pointer-p ptr) ptr))
+
+(defun validate-pointer (ptr)
+  (or (valid-pointer ptr)
+      (error "Unexpected NULL pointer")))

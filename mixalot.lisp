@@ -1,6 +1,6 @@
 ;;;; Mixalot audio mixer for ALSA
 
-;;;; Copyright (c) 2009 Andy Hefner
+;;;; Copyright (c) 2009,2010 Andy Hefner
 
 ;;;; Permission is hereby granted, free of charge, to any person obtaining
 ;;;; a copy of this software and associated documentation files (the
@@ -23,8 +23,10 @@
 ;;;; OTHER DEALINGS IN THE SOFTWARE.
 
 (defpackage :mixalot
-  (:use :common-lisp :cffi :bordeaux-threads)
+  (:use :common-lisp :cffi :bordeaux-threads :mixalot-ffi-common)
   (:export #:alsa-error
+           #:main-thread-init
+
            #:sample-vector
            #:stereo-sample
            #:mono-sample
@@ -78,101 +80,9 @@
 
 (in-package :mixalot)
 
-;;;; FFI to minimal subset of ALSA library
-
-(define-foreign-library libasound
-    (t (:or "libasound.so.2" "libasound.so"
-            "/usr/lib/libasound.so"
-            "/usr/local/lib/libasound.so")))
-
-(use-foreign-library libasound)
-
-(define-condition alsa-error (error)
-  ((text :initarg :text))
-  (:documentation "An error from the ALSA library")
-  (:report
-   (lambda (condition stream)
-     (write-string (slot-value condition 'text) stream))))
-
-(defcfun snd-strerror :string (errnum :int))
-
-(defun check-error (circumstance result)
-  (unless (zerop result)
-    (error 'alsa-error 
-           :text (format nil "~A: ~A" circumstance (snd-strerror result)))))
-
-(defctype snd-pcm :pointer)
-
-(defcenum snd-pcm-stream
-    (:playback 0)
-    (:capture 1))
-
-(defcenum snd-pcm-mode
-    (:blocking 0)
-    (:nonblocking 1)
-    (:async 2))
-
-(defcfun (%snd-pcm-open "snd_pcm_open") :int
-  (pcm (:pointer snd-pcm))
-  (name :string)
-  (type snd-pcm-stream)
-  (mode snd-pcm-mode))
-
-(defun valid-pointer (ptr) (unless (null-pointer-p ptr) ptr))
-
-(defun validate-pointer (ptr)
-  (or (valid-pointer ptr)
-      (error "Unexpected NULL pointer")))
-
-(defun snd-pcm-open (name stream-type mode)
-  (with-foreign-object (pcm 'snd-pcm)
-    (check-error
-     (format nil "PCM open of ~W (~A,~A)" name stream-type mode)
-     (%snd-pcm-open pcm name stream-type mode))
-    (validate-pointer (mem-ref pcm 'snd-pcm))))
-
-(defcfun snd-pcm-close :int 
-  (pcm snd-pcm))
-
-(defcenum snd-pcm-format 
-  (:snd-pcm-format-s16-le 2))
-
-(defcenum snd-pcm-access
-    (:snd-pcm-access-rw-interleaved 3)
-    (:snd-pcm-access-rw-noninterleaved 4))
-
-(defcfun snd-pcm-set-params :int
-  (pcm           snd-pcm)
-  (format        snd-pcm-format)
-  (access        snd-pcm-access)
-  (channels      :unsigned-int)
-  (rate          :unsigned-int)
-  (soft-resample :int)
-  (latency       :unsigned-int))
-
-(defcfun snd-pcm-recover :int
-  (pcm    snd-pcm)
-  (err    :int)
-  (silent :int))
-
-(defctype snd-pcm-sframes :long)
-(defctype snd-pcm-uframes :unsigned-long)
-
-(defcfun snd-pcm-writei snd-pcm-sframes
-  (pcm    snd-pcm)
-  (buffer :pointer)
-  (size   snd-pcm-uframes))
-
-(defctype snd-output :pointer)
-
-(defcfun snd-output-stdio-attach :int
-  (outputp (:pointer snd-output))
-  (file    :pointer)
-  (close   :int))
-
-(defcfun snd-pcm-dump :int 
-  (pcm snd-pcm)
-  (out snd-output))
+(eval-when (:compile-toplevel)
+  #-linux (pushnew 'use-ao *features*)
+  #+linux (pushnew 'use-alsa *features*))
 
 (deftype array-index ()
   #-sbcl '(integer 0 #.array-dimension-limit)
@@ -187,10 +97,124 @@
 
 (deftype sample-vector () '(simple-array stereo-sample 1))
 
+;;;; FFI to minimal subset of ALSA library
+
+#+mixalot::use-alsa
+(define-foreign-library libasound
+    (t (:or "libasound.so.2" "libasound.so"
+            "/usr/lib/libasound.so"
+            "/usr/local/lib/libasound.so")))
+
+#+mixalot::use-alsa
+(use-foreign-library libasound)
+
+#+mixalot::use-alsa
+(define-condition alsa-error (error)
+  ((text :initarg :text))
+  (:documentation "An error from the ALSA library")
+  (:report
+   (lambda (condition stream)
+     (write-string (slot-value condition 'text) stream))))
+
+#+mixalot::use-alsa
+(defcfun snd-strerror :string (errnum :int))
+
+#+mixalot::use-alsa
+(defun check-error (circumstance result)
+  (unless (zerop result)
+    (error 'alsa-error 
+           :text (format nil "~A: ~A" circumstance (snd-strerror result)))))
+
+#+mixalot::use-alsa
+(defctype snd-pcm :pointer)
+
+#+mixalot::use-alsa
+(defcenum snd-pcm-stream
+    (:playback 0)
+    (:capture 1))
+
+#+mixalot::use-alsa
+(defcenum snd-pcm-mode
+    (:blocking 0)
+    (:nonblocking 1)
+    (:async 2))
+
+#+mixalot::use-alsa
+(defcfun (%snd-pcm-open "snd_pcm_open") :int
+  (pcm (:pointer snd-pcm))
+  (name :string)
+  (type snd-pcm-stream)
+  (mode snd-pcm-mode))
+
+#+mixalot::use-alsa
+(defun snd-pcm-open (name stream-type mode)
+  (with-foreign-object (pcm 'snd-pcm)
+    (check-error
+     (format nil "PCM open of ~W (~A,~A)" name stream-type mode)
+     (%snd-pcm-open pcm name stream-type mode))
+    (validate-pointer (mem-ref pcm 'snd-pcm))))
+
+#+mixalot::use-alsa
+(defcfun snd-pcm-close :int 
+  (pcm snd-pcm))
+
+#+mixalot::use-alsa
+(defcenum snd-pcm-format 
+  (:snd-pcm-format-s16-le 2))
+
+#+mixalot::use-alsa
+(defcenum snd-pcm-access
+    (:snd-pcm-access-rw-interleaved 3)
+    (:snd-pcm-access-rw-noninterleaved 4))
+
+#+mixalot::use-alsa
+(defcfun snd-pcm-set-params :int
+  (pcm           snd-pcm)
+  (format        snd-pcm-format)
+  (access        snd-pcm-access)
+  (channels      :unsigned-int)
+  (rate          :unsigned-int)
+  (soft-resample :int)
+  (latency       :unsigned-int))
+
+#+mixalot::use-alsa
+(defcfun snd-pcm-recover :int
+  (pcm    snd-pcm)
+  (err    :int)
+  (silent :int))
+
+#+mixalot::use-alsa (defctype snd-pcm-sframes :long)
+#+mixalot::use-alsa (defctype snd-pcm-uframes :unsigned-long)
+
+#+mixalot::use-alsa
+(defcfun snd-pcm-writei snd-pcm-sframes
+  (pcm    snd-pcm)
+  (buffer :pointer)
+  (size   snd-pcm-uframes))
+
+#+mixalot::use-alsa (defctype snd-output :pointer)
+
+#+mixalot::use-alsa
+(defcfun snd-output-stdio-attach :int
+  (outputp (:pointer snd-output))
+  (file    :pointer)
+  (close   :int))
+
+#+mixalot::use-alsa
+(defcfun snd-pcm-dump :int 
+  (pcm snd-pcm)
+  (out snd-output))
+
+#+mixalot::use-alsa
+(defun main-thread-init ()
+  ;; libao needs this. ALSA does not, which is the only good thing I can say about it.
+  (values))
+
 ;;;; ALSA Utilities
 
-(defcvar stdout :pointer)
+#+mixalot::use-alsa (defcvar stdout :pointer)
 
+#+mixalot::use-alsa
 (defun dump-pcm-info (pcm)
   (with-foreign-object (output :pointer)
     (check-error
@@ -200,6 +224,7 @@
      "PCM diagnostic state dump"
      (snd-pcm-dump pcm (mem-ref output :pointer)))))
 
+#+mixalot::use-alsa
 (defun call-with-pcm (rate continuation)
   (let ((pcm (snd-pcm-open "default" :playback :blocking)))
     (unwind-protect 
@@ -211,6 +236,78 @@
              2 rate 1 300000))
            (funcall continuation pcm))
       (snd-pcm-close pcm))))
+
+;;;; Alternate interface using libao on OS X. 
+
+;;; This isn't ideal. You're forced to initialize the audio system
+;;; (and thus the mixer) from the "main thread", due to OS X being a
+;;; half-assed joke.
+
+;;; In theory this could work in Win32 as well. I haven't tried it.
+
+#+mixalot::use-ao
+(define-foreign-library libao
+  (:darwin (:or "libao.4.dylib" "/opt/local/lib/libao.4.dylib"))
+  (t (:or "libao.so")))
+
+#+mixalot::use-ao (use-foreign-library libao)
+
+;; Danger! This must be called from the main thread! Stupid OS X.
+#+mixalot::use-ao
+(defcfun ao-initialize :void)
+
+#+mixalot::use-ao
+(defcfun ao-default-driver-id :int)
+
+#+mixalot::use-ao
+(defcstruct (ao-sample-format :conc-name ao-fmt-)
+  (bits :int)
+  (rate :int)
+  (channels :int)
+  (byte-format :int)
+  (matrix :string))
+
+#+mixalot::use-ao (defconstant AO_FMT_LITTLE 1)
+#+mixalot::use-ao (defconstant AO_FMT_BIG    2)
+#+mixalot::use-ao (defconstant AO_FMT_NATIVE 4)
+
+#+mixalot::use-ao (defctype ao-device* :pointer)
+
+#+mixalot::use-ao
+(defcfun ao-open-live ao-device*
+  (driver-id :int)
+  (format (:pointer ao-sample-format))
+  (options :pointer))
+
+#+mixalot::use-ao (defvar *ao-main-thread-init* nil)
+#+mixalot::use-ao (defvar *aodev* nil)
+
+#+mixalot::use-ao
+(defun open-ao (&key (rate 44100))
+  (unless *ao-main-thread-init*
+    (error "libao not initialized. You must call MIXALOT:MAIN-THREAD-INIT from the main thread of your lisp. In SBCL, this will be the initial REPL (the *inferior-lisp* buffer in SLIME). If you call it from another thread, Lisp may crash."))
+  (with-foreign-object (fmt 'ao-sample-format)
+    (with-foreign-string (matrix "L,R")
+     (setf (ao-fmt-bits fmt) 16
+           (ao-fmt-channels fmt) 2
+           (ao-fmt-rate fmt) rate
+           (ao-fmt-byte-format fmt) AO_FMT_LITTLE
+           (ao-fmt-matrix fmt) matrix) 
+    (ao-open-live (ao-default-driver-id)
+                   fmt
+                   (null-pointer)))))
+
+#+mixalot::use-ao
+(defun main-thread-init ()
+  (unless *ao-main-thread-init*
+    (setf *ao-main-thread-init* t)
+    (ao-initialize)))
+
+#+mixalot::use-ao
+(defcfun ao-play :int
+  (device ao-device*)
+  (output-samples :pointer)
+  (num-bytes :uint32))
 
 
 ;;;; Basic stream protocol
@@ -315,7 +412,7 @@
   (rate         44100)
   (shutdown-flag nil)
   (stream-state (make-hash-table))
-  pcm-instance)
+  device)
 
 (defmacro with-mixer-lock ((mixer) &body body)
   `(with-lock-held ((mixer-stream-lock ,mixer))
@@ -443,21 +540,29 @@
           (fill buffer 0)
           (setf buffer-clear t))
         ;; Play the buffer.
+        #+mixalot::use-ao        
+        (let ((ret 
+               (with-array-pointer (ptr buffer)
+                 (ao-play (mixer-device mixer) ptr (* 4 buffer-samples)))))
+          (when (zerop ret)
+            (format *trace-output* "libao error.")))
+
+        #+mixalot::use-alsa
         (loop with offset of-type mixer-buffer-index = 0
               as nwrite = (- buffer-samples offset)
               as nframes = (with-array-pointer (ptr buffer)
                              (incf-pointer ptr (* offset 4))
-                             (snd-pcm-writei (mixer-pcm-instance mixer) ptr nwrite))
+                             (snd-pcm-writei (mixer-device mixer) ptr nwrite))
               do
               (unless (zerop offset)
                 (format t "~&mixer time ~A partial offset ~:D~%"
                         (mixer-current-time mixer)
                         offset))
-              (cond
-                ((not (integerp nframes)) (error "wtf"))
+              (assert (integerp nframes))
+              (cond                
                 ((< nframes 0)
                  (format *trace-output* "~&nframes<0, snd-pcm-recover")
-                 (snd-pcm-recover (mixer-pcm-instance mixer) nframes 1))
+                 (snd-pcm-recover (mixer-device mixer) nframes 1))
                 ((< nframes nwrite)
                  (format *trace-output* "~&short write ~D vs ~D (offset ~D)~%"
                          nframes (- buffer-samples offset) offset)
@@ -476,12 +581,19 @@
 
 (defun create-mixer (&key (rate 44100))
   "Create a new mixer at the specified sample rate, running in its own thread."
+  #-(or mixalot::use-ao mixalot::use-alsa)
+  (error "Neither mixalot::use-ao nor mixalot::use-alsa existed on *features* when this function was compiled. That is wrong.")
   (let ((mixer (make-mixer :rate rate)))
     (bordeaux-threads:make-thread
-     (lambda ()
+     (lambda ()       
+       #+mixalot::use-ao
+       (progn
+         (setf (mixer-device mixer) (open-ao :rate rate))
+         (run-mixer-process mixer))
+       #+mixalot::use-alsa
        (call-with-pcm rate
         (lambda (pcm)
-          (setf (mixer-pcm-instance mixer) pcm)
+          (setf (mixer-device mixer) pcm)
           (run-mixer-process mixer))))
      :name (format nil "Mixer thread ~:D Hz" rate))
     mixer))

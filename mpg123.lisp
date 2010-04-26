@@ -173,6 +173,8 @@
 
 
 (define-foreign-library libmpg123
+  (:darwin (:or "libmpg123.dylib" "libmpg123.0.dylib" 
+                "/opt/local/lib/libmpg123.0.dylib"))
   (:unix (:or "libmixalot-mpg123.so.0"
               "libmpg123.so.0"
               "/usr/lib/libmpg123.so"
