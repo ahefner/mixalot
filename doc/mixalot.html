@@ -60,15 +60,19 @@
 
 <p>Mixalot is a grab bag of systems related to audio in Common Lisp
 under an MIT-style license. Currently it consists of a mixer component
-targeting the Advanced Linux Sound Architecture, a CFFI binding to the
-libmpg123 library, and a system allowing playback of MP3 files through
-the mixer.</p>
+providing straightforward audio output on Linux (via ALSA) and other platforms
+(using <a href="http://xiph.org/ao/">libao</a>),
+a <a href="http://common-lisp.net/project/cffi/">CFFI</a> binding to
+the libmpg123 library, and a helper component allowing playback of MP3
+files through the mixer.</p>
 
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="Installation"></a>Installation</h2>
 
-<p>The most recent version of Mixalot can be obtained from <a href="http://vintage-digital.com/hefner/software/mixalot/mixalot-current.tar.gz">http://vintage-digital.com/hefner/software/mixalot/mixalot-current.tar.gz</a>. 
-</p>
+<p>The most recent version of Mixalot is hosted on <a href="http://github.com/ahefner/mixalot">github</a> and can be obtained as follows:</p>
+<pre class="lisp">
+git clone git://github.com/ahefner/mixalot.git</pre>
+The latest stable release is 0.0.2a and can be downloaded from <a href="http://vintage-digital.com/hefner/software/mixalot/mixalot-0.0.2a.tar.gz">http://vintage-digital.com/hefner/software/mixalot/mixalot-0.0.2a.tar.gz</a>. </p>
 
 <p>Mixalot includes several ASDF systems which should be symlinked into the ASDF central registry in the usual fashion. It depends directly on the following systems:</p>
 <ul>
@@ -79,8 +83,8 @@ the mixer.</p>
 
 <p>You may find this library useful for the following purposes:</p>
 <ul>
-  <li>Audio output in Linux, if you aren't overly concerned with latency</li>
-  <li>Decoding an mp3 file to a vector</li>
+  <li>Audio output, if you aren't overly concerned with latency</li>
+  <li>Decoding an mp3 file to a vector in memory</li>
   <li>Playing an mp3 file</li>
   <li>Querying id3 tags</li>
 </ul>
@@ -90,14 +94,24 @@ the mixer.</p>
 <h2><a name="Portability"></a>Portability</h2>
 
 <p>The CFFI and bordeaux-threads libraries are used to ease porting
-between lisp implementations. The mixer component of Mixalot relies on
-ALSA and as such will only run on Linux systems. In order to be useful
-in an application, the mixer must also run in its own (native)
-thread. Therefore, the <tt>mixalot</tt> and <tt>mixalot-mp3</tt>
-systems are currently usable only on SBCL (w/sb-thread) and Clozure
-Common Lisp under Linux. The <tt>mpg123-ffi</tt> system should be
-usable on any lisp that supports CFFI.
-</p>
+between lisp implementations. The mixer component of Mixalot chooses
+at compile time to use ALSA (on Linux)
+or <a href="http://xiph.org/ao/">libao</a> (everywhere else) and
+should be able to produce audio on any platform supported by libao. In
+order to be useful in an application, the mixer must also run in its
+own (native) thread. 
+Therefore, the <tt>mixalot</tt> and <tt>mixalot-mp3</tt> systems should be usable on CL implementations capable of running multiple threads, on Linux or platforms supported by libao. It has been tested and is known to work in the following configurations:</p>
+<ul>
+  <li>SBCL (w/sb-thread enabled) on Linux/x86 and Linux/x86-64</li>
+  <li>SBCL (w/sb-thread enabled) on Mac OS X 10.6.3 (x86_64)</li>
+  <li>Clozure CL on Linux/x86_64</li>
+</ul>
+It has been tested on the following platforms and found not to work:
+<ul>
+  <li>ECL on Linux x86_64 (stuttering audio - performance issue?)</li>
+</ul>
+
+<p>The <tt>mpg123-ffi</tt> system is independent and should be usable on any CL supported by CFFI.</p>
 
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="mixalot"></a>System: mixalot</h2>
@@ -120,6 +134,26 @@ stream classes.</p>
 package, there are functions to create/destroy mixers, and add/remove
 streamers from a mixer.</p>
 
+
+<div class="def"><a name='main-thread-init'>Function</a>
+                       <b>main-thread-init</b> 
+ <div class="docbody">
+   <p>Initialize the platform's audio subsystem. This must be called
+   from the main thread of the application. Under SBCL, this will be
+   the thread containing the initial REPL, or the *inferior-lisp*
+   buffer while using SLIME (TODO: investigate situation on Clozure
+   CL). It is only necessary to call this once, and must be done
+   before calling <a href="#create-mixer"><tt>create-mixer</tt></a>
+   (which can be called from any thread).</p>
+
+   <p>On Linux, Mixalot uses ALSA, which requires no such
+   initialization. For consistency, this function is defined to do
+   nothing, and calling it is unnecessary. On other platforms, which
+   use libao for audio output, this initialization is mandatory due
+   to arbitrary restrictions imposed by certain operating systems
+   (notably Mac OS X).</p>
+ </div>
+</div>
 
 <div class="def"><a name='create-mixer'>Function</a>
                        <b>create-mixer</b> 
@@ -902,11 +936,10 @@ CL-USER> (mixalot:mixer-add-streamer *mixer*
 <p>Various ideas for improvement, which might appear on an as-needed basis:</p>
 <ul>
   <li>Bindings to libvorbis, and a <tt>vorbis-streamer</tt></li>
-  <li>Interface to libsndfile</li>
+  <li>Interface to libsndfile (work in progress)</li>
   <li>Scheduled start times for streamers</li>
   <li>Refactor mixer into an audio sink and a mixing streamer, making submixes possible through the existing API.</li>
   <li>Protocol for insert effects (between streamer and mixer)</li>
-  <li>Audio output for OSS or Mac OS X (patches welcome..)</li>
 </ul>
 
 <!--  ----------------------------------------------------------------- -->
