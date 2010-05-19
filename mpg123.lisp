@@ -836,6 +836,9 @@ list."
                               :test #'equalp)
                       (eql 14 (mismatch "Unknown Album " (getf properties :album))))
               (remf properties :artist))
+            ;; This is particularly stupid:
+            (when (equalp "genre" (getf properties :genre))
+              (remf properties :genre))
             ;; Debugging: Print all text entries, if enabled
             (when (and print-misc-tags (not (null-pointer-p v2)))
               (dump-mpg123-texts "Comment" (id3v2-comment-list v2) (id3v2-comments v2))
