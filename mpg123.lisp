@@ -835,7 +835,7 @@ list."
                               '("Unknown" "Unknown Disc" "<Unknown>")                      
                               :test #'equalp)
                       (eql 14 (mismatch "Unknown Album " (getf properties :album))))
-              (remf properties :artist))
+              (remf properties :album))
             ;; This is particularly stupid:
             (when (equalp "genre" (getf properties :genre))
               (remf properties :genre))
