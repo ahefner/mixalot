@@ -9,7 +9,7 @@
 
 ;;;; Basic types
 
-(cstruct oggvorbis-file "OggVorbis_File")
+(cstruct vorbis-file "OggVorbis_File")
 
 (cstruct vorbis-info "vorbis_info"
   (version "version" :type :int)

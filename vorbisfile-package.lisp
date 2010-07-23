@@ -1,16 +1,23 @@
 (defpackage :vorbisfile
   (:use :common-lisp :cffi)
-  (:export #:oggvorbis-strerror
-           #:check-oggvorbis-error
-           #:check-oggvorbis-pointer-error
-           #:raise-oggvorbis-error
+  (:export #:vorbis-strerror
+           #:check-vorbis-error
+           #:check-vorbis-pointer-error
+           #:raise-vorbis-error
 
-           #:oggvorbis-new
-           #:oggvorbis-delete
-           #:oggvorbis-open
-           #:oggvorbis-close
-           #:get-oggvorbis-channels
-           #:get-oggvorbis-length
-           #:get-oggvorbis-rate
+           #:vorbis-new
+           #:vorbis-delete
+           #:vorbis-open
+           #:vorbis-close
+           #:vorbis-seek
+
+           #:get-vorbis-channels
+           #:get-vorbis-length
+           #:get-vorbis-rate
+           #:get-vorbis-position
+
+           #:get-vorbis-tags-from-handle
+           #:get-vorbis-tags-from-file
            
-           #:ov-read))
+           #:ov-read
+           #:ov-seekable))

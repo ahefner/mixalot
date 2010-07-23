@@ -20,25 +20,25 @@
 (defun open-vorbis-file (filename &key (output-rate 44100) (link 0))
   "Open an Ogg Vorbis file from disk and return the handle and sample
   rate of the given logical bitstream."
-  (let* ((handle (oggvorbis-new))
-         (result (oggvorbis-open filename handle))
+  (let* ((handle (vorbis-new))
+         (result (vorbis-open filename handle))
         rate)
     (flet ((raise-error (msg)
-             (oggvorbis-delete handle)
-             (raise-oggvorbis-error "Open Ogg Vorbis file" msg)))
+             (vorbis-delete handle)
+             (raise-vorbis-error "Open Ogg Vorbis file" msg)))
       (format nil "open: ~A~%" result)
       (if (zerop result)
-        (if (= output-rate (setf rate (get-oggvorbis-rate handle link)))
+        (if (= output-rate (setf rate (get-vorbis-rate handle link)))
           (values handle rate)
           (raise-error "Sample rate doesn't match requested rate."))
-        (raise-error (oggvorbis-strerror result))))))
+        (raise-error (vorbis-strerror result))))))
 
 (defun vorbis-streamer-release-resources (vorbis-stream)
   "Release foreign resources associated with the vorbis-stream."
   (with-slots (handle) vorbis-stream
     (when handle
-      (oggvorbis-close handle)
-      (oggvorbis-delete handle)
+      (vorbis-close handle)
+      (vorbis-delete handle)
       (setf handle nil))))
 
 (defmethod streamer-cleanup ((stream vorbis-streamer) mixer)
@@ -52,7 +52,7 @@
      (class 'vorbis-streamer)
      (link 0)
      &allow-other-keys)
-  "Create an ogg vorbis audio stream from a file, raising an oggvorbis-error
+  "Create an ogg vorbis audio stream from a file, raising an vorbis-error
   if the file cannot be opened or another error occurs."
   (multiple-value-bind (handle sample-rate)
       (open-vorbis-file filename :output-rate output-rate :link link)
@@ -66,16 +66,25 @@
                          'filename filename
                          args)))
       (with-slots (length handle) stream
-        (let ((result (get-oggvorbis-length handle link)))
+        (let ((result (get-vorbis-length handle link)))
           (when (> result 0)
             (setf length result))))
       stream)))
+
+(defun update-for-seek (stream)
+  (with-slots (handle seek-to position output-rate sample-rate) stream
+    (when seek-to 
+      (vorbis-seek handle seek-to)
+     (setf seek-to nil
+           position (floor (* output-rate (get-vorbis-position handle))
+                           sample-rate)))))
 
 (defmethod streamer-mix-into ((streamer vorbis-streamer) mixer mix-buffer offset length time)
   (declare (ignore time)
            (optimize (speed 3))
            (type array-index offset length)
            (type sample-vector mix-buffer))
+  (update-for-seek streamer)
   (with-foreign-object (bitstream :int)
     (let* ((max-buffer-length 8192)
            (handle (vorbis-handle streamer))
@@ -116,5 +125,28 @@
                          streamer 
                          (slot-value streamer 'filename)
                          nread
-                         (oggvorbis-strerror nread ))
+                         (vorbis-strerror nread ))
                  (mixer-remove-streamer mixer streamer))))))))
+
+;;; Seek protocol
+
+(defmethod streamer-seekable-p ((stream vorbis-streamer) mixer)
+  (declare (ignore mixer))
+  (ov-seekable (vorbis-handle stream)))
+
+(defmethod streamer-length ((stream vorbis-streamer) mixer)
+  (declare (ignore mixer))
+  (with-slots (length) stream 
+    length))
+
+(defmethod streamer-seek ((stream vorbis-streamer) mixer position 
+                          &key &allow-other-keys)
+  (declare (ignore mixer))
+  (with-slots (seek-to sample-rate output-rate) stream
+    (setf seek-to (floor (* sample-rate position) output-rate)))
+  (values))
+
+(defmethod streamer-position ((stream vorbis-streamer) mixer)
+  (declare (ignore mixer))
+  (with-slots (position) stream
+    position))
