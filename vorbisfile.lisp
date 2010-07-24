@@ -173,7 +173,7 @@
     (foreign-free handle)))
 
 (defun vorbis-open (filename handle)
-  "Open an Ogg Vorbis file and attach the given handle."
+  "Open an Ogg Vorbis file and attach it to the given handle."
   (check-vorbis-error "Open Ogg Vorbis file" (ov-fopen filename handle)))
 
 (defun vorbis-close (handle)
@@ -274,10 +274,8 @@
 
 (defun get-vorbis-tags-from-file (filename &optional (link -1))
   "Open an Ogg Vorbis file, retrieve the tags, and close it."
-  (let ((handle (vorbis-new)))
-    (unwind-protect
-      (progn
-        (vorbis-open filename handle)
-        (get-vorbis-tags-from-handle handle link))
-      (vorbis-close handle)
-      (vorbis-delete handle))))
+  (with-foreign-object (handle 'vorbis-file)
+     (vorbis-open filename handle)
+     (unwind-protect
+       (get-vorbis-tags-from-handle handle link)
+       (vorbis-close handle))))
