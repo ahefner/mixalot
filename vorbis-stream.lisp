@@ -20,18 +20,19 @@
 (defun open-vorbis-file (filename &key (output-rate 44100) (link 0))
   "Open an Ogg Vorbis file from disk and return the handle and sample
   rate of the given logical bitstream."
-  (let* ((handle (vorbis-new))
-         (result (vorbis-open filename handle))
+  (let ((handle (vorbis-new))
         rate)
-    (flet ((raise-error (msg)
-             (vorbis-delete handle)
-             (raise-vorbis-error "Open Ogg Vorbis file" msg)))
-      (format nil "open: ~A~%" result)
-      (if (zerop result)
-        (if (= output-rate (setf rate (get-vorbis-rate handle link)))
-          (values handle rate)
-          (raise-error "Sample rate doesn't match requested rate."))
-        (raise-error (vorbis-strerror result))))))
+    (handler-case (vorbis-open filename handle)
+      (vorbis-error ()
+        (vorbis-delete handle)
+        nil))
+    (if (= output-rate (setf rate (get-vorbis-rate handle link)))
+      (values handle rate)
+      (progn
+        (warn 'vorbis-error "Open Ogg Vorbis file"
+              "Sample rate doesn't match requested rate.")
+        (vorbis-close handle)
+        (vorbis-delete handle)))))
 
 (defun vorbis-streamer-release-resources (vorbis-stream)
   "Release foreign resources associated with the vorbis-stream."

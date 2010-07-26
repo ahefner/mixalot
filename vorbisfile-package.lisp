@@ -1,6 +1,7 @@
 (defpackage :vorbisfile
   (:use :common-lisp :cffi)
-  (:export #:vorbis-strerror
+  (:export #:vorbis-error
+           #:vorbis-strerror
            #:check-vorbis-error
            #:check-vorbis-pointer-error
            #:raise-vorbis-error
