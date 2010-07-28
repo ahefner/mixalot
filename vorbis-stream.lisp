@@ -13,6 +13,7 @@
    (output-rate :reader vorbis-output-rate :initarg :output-rate)
    (filename  :initform nil :initarg filename)
    (buffer    :initform nil :accessor buffer)
+   (channels  :initform 0 :accessor channels :initarg :channels)
    (length    :initform nil)
    (position  :initform 0)
    (seek-to   :initform nil)))
@@ -20,19 +21,21 @@
 (defun open-vorbis-file (filename &key (output-rate 44100) (link 0))
   "Open an Ogg Vorbis file from disk and return the handle and sample
   rate of the given logical bitstream."
-  (let (handle uhandle rate)
+  (let (handle uhandle rate channels)
     (unwind-protect
       (setf uhandle (vorbis-new))
       (vorbis-open filename uhandle)
-      (unless (= output-rate (setf rate (get-vorbis-rate uhandle link)))
+      (setf rate (get-vorbis-rate uhandle link)
+            channels (get-vorbis-channels uhandle link))
+      (unless (= output-rate rate)
         (raise-vorbis-error "Open Ogg Vorbis file"
                             "Sample rate doesn't match requested rate."))
-      (unless (= 2 (get-vorbis-channels uhandle link))
+      (unless (or (= channels 2) (= channels 1))
         (raise-vorbis-error "Open Ogg Vorbis file"
-                            "Vorbis file is not stereo."))
+                            "Vorbis file is not mono or stereo."))
       (rotatef handle uhandle))
     (when uhandle (vorbis-close uhandle))
-    (values handle rate)))
+    (values handle rate channels)))
 
 (defun vorbis-streamer-release-resources (vorbis-stream)
   "Release foreign resources associated with the vorbis-stream."
@@ -55,7 +58,7 @@
      &allow-other-keys)
   "Create an ogg vorbis audio stream from a file, raising an vorbis-error
   if the file cannot be opened or another error occurs."
-  (multiple-value-bind (handle sample-rate)
+  (multiple-value-bind (handle sample-rate channels)
       (open-vorbis-file filename :output-rate output-rate :link link)
     (remf args :class)
     (remf args :link)
@@ -64,6 +67,7 @@
                          :handle handle                         
                          :sample-rate sample-rate
                          :output-rate output-rate
+                         :channels channels
                          'filename filename
                          args)))
       (with-slots (length handle) stream
@@ -89,11 +93,15 @@
   (with-foreign-object (bitstream :int)
     (let* ((max-buffer-length 8192)
            (handle (vorbis-handle streamer))
+           (channels (channels streamer))
+           (frame-size (* 2 channels))
            (read-buffer (or (buffer streamer)
                             (setf (buffer streamer)
                                   (make-array max-buffer-length
-                                              :element-type 'stereo-sample)))))
-      (declare (type sample-vector read-buffer))
+                                              :element-type (case channels
+                                                              (1 'mono-sample)
+                                                              (2 'stereo-sample)))))))
+      ;(declare (type sample-vector read-buffer))
       (mixalot:with-array-pointer (bufptr read-buffer)
         (loop with end-output-index = (the array-index (+ offset length))
               with output-index = offset
@@ -103,12 +111,14 @@
               while (< output-index end-output-index) do 
 
               (setf chunk-size (min max-buffer-length (- end-output-index output-index))
-                    nread (ov-read handle bufptr (* 4 chunk-size) 0 2 1 bitstream)
-                    samples-read (the array-index (ash nread -2)))
+                    nread (ov-read handle bufptr (* frame-size chunk-size) 0 2 1 bitstream)
+                    samples-read (the array-index (/ nread frame-size)))
 
               (when (< nread 0) (loop-finish))
               
               ;; Mix into buffer
+              (when (= 1 channels)
+                (setf read-buffer (mono->stereo read-buffer)))
               (loop for out-idx upfrom (the array-index output-index)
                     for in-idx upfrom 0
                     repeat samples-read
