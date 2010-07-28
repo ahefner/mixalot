@@ -18,23 +18,28 @@
    (position  :initform 0)
    (seek-to   :initform nil)))
 
+;; Hmm, looks ugly...
 (defun open-vorbis-file (filename &key (output-rate 44100) (link 0))
   "Open an Ogg Vorbis file from disk and return the handle and sample
   rate of the given logical bitstream."
   (let (handle uhandle rate channels)
     (unwind-protect
-      (setf uhandle (vorbis-new))
-      (vorbis-open filename uhandle)
-      (setf rate (get-vorbis-rate uhandle link)
-            channels (get-vorbis-channels uhandle link))
-      (unless (= output-rate rate)
-        (raise-vorbis-error "Open Ogg Vorbis file"
-                            "Sample rate doesn't match requested rate."))
-      (unless (or (= channels 2) (= channels 1))
-        (raise-vorbis-error "Open Ogg Vorbis file"
-                            "Vorbis file is not mono or stereo."))
-      (rotatef handle uhandle))
-    (when uhandle (vorbis-close uhandle))
+      (progn
+        (setf uhandle (vorbis-new))
+        (vorbis-open filename uhandle)
+        (unwind-protect
+          (progn
+            (setf rate (get-vorbis-rate uhandle link)
+                  channels (get-vorbis-channels uhandle link))
+            (unless (= output-rate rate)
+              (raise-vorbis-error "Open Ogg Vorbis file"
+                                  "Sample rate doesn't match requested rate."))
+            (unless (or (= channels 2) (= channels 1))
+              (raise-vorbis-error "Open Ogg Vorbis file"
+                                  "Vorbis file is not mono or stereo."))
+            (rotatef handle uhandle))
+          (when uhandle (vorbis-close uhandle))))
+      (when uhandle (vorbis-delete uhandle)))
     (values handle rate channels)))
 
 (defun vorbis-streamer-release-resources (vorbis-stream)
