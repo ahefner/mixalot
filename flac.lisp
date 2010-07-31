@@ -84,5 +84,3 @@
 
 (defcfun ("FLAC__stream_decoder_get_state" flac-decoder-get-state) flac-decoder-state
   (decoder handleptr))
-
-;;;; Helper functions
