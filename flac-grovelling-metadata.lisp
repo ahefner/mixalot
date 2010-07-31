@@ -5,7 +5,7 @@
 (in-package :flac)
 
 (include "FLAC/stream_decoder.h")
-(cc-flags "-lFLAC")
+(cc-flags "-lFLAC" "-lm")
 
 (cstruct flac-metadata "FLAC__StreamMetadata"
   (type "type" :type flac-metadata-type)

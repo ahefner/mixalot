@@ -79,4 +79,10 @@
 (defcfun ("FLAC__stream_decoder_process_until_end_of_metadata" flac-decoder-process-until-end-of-metadata) flac-bool
   (decoder handleptr))
 
+(defcfun ("FLAC__stream_decoder_process_single" flac-decoder-process-single) flac-bool
+  (decoder handleptr))
+
+(defcfun ("FLAC__stream_decoder_get_state" flac-decoder-get-state) flac-decoder-state
+  (decoder handleptr))
+
 ;;;; Helper functions

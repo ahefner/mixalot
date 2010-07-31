@@ -25,6 +25,6 @@
 (in-package :flac)
 
 (defcunion flac-metadata-data
-  (stream-info flac-metadata-streaminfo)
+  (stream-info flac-metadata-stream-info)
   (padding flac-metadata-padding)
   (application flac-metadata-application))
