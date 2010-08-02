@@ -127,6 +127,8 @@
    (lambda (condition stream)
      (write-string (slot-value condition 'text) stream))))
 
+;;; Simulate a strerror type function with text mostly copied from the
+;;; vorbisfile manual.
 (defvar *vorbis-strerror* (list
   (cons OV_HOLE "There was an interruption in the data.")
   (cons OV_EREAD "A read from media returned an error.")
@@ -150,12 +152,14 @@
          :text (format nil "~A: ~A" circumstance message)))
 
 (defun check-vorbis-error (circumstance result)
+  "Check if an error has occured in the vorbisfile library calls."
   (if (< result 0)
     (raise-vorbis-error circumstance
                         (vorbis-strerror result))
     result))
 
 (defun check-vorbis-pointer-error (circumstance pointer)
+  "Check if an error has occured in the vorbisfile library calls pertaining to a pointer."
   (if (null-pointer-p pointer)
     (raise-vorbis-error circumstance
                         "Operation performed on invalid physical or logical stream.")
@@ -163,6 +167,7 @@
 
 ;;;; Helper functions
 
+;; Allocate and free foreign resources
 (defun vorbis-new ()
   "Return a new Ogg Vorbis handle."
   (foreign-alloc 'vorbis-file))
@@ -172,6 +177,7 @@
   (unless (null-pointer-p handle)
     (foreign-free handle)))
 
+;; Open and close a vorbis file on the given handle
 (defun vorbis-open (filename handle)
   "Open an Ogg Vorbis file and attach it to the given handle."
   (check-vorbis-error "Open Ogg Vorbis file" (ov-fopen filename handle)))
@@ -180,12 +186,15 @@
   "Close an Ogg Vorbis file by its handle."
   (check-vorbis-error "Close Ogg Vorbis file" (ov-clear handle)))
 
+;; seek-page-lap is nicer as a seek function, since it seeks fast (page) and
+;; laps so that (almost) no clicking is heard.
 (defun vorbis-seek (handle position)
   "Seek (rougly) to the given position in samples."
   (check-vorbis-error "Seeking in stream" (ov-pcm-seek-page-lap handle position)))
 
 ;;;; Information
 
+;; Information struct contains some parameters of the audio stream.
 (defun get-vorbis-info (handle &optional (link -1))
   "Return vorbis-info of the specified handle and logical bitstream."
   (mem-ref (check-vorbis-pointer-error "Retrieving vorbis info" (ov-info handle link)) 'vorbis-info))
@@ -235,6 +244,8 @@
     (when tag-values
       (format nil "~{~A~^, ~}" tag-values))))
 
+;; This function contains some code from mpg123.lisp. I suggest the whole
+;; tagging stuff is refactored.
 (defun get-vorbis-tags-from-handle (handle &optional (link -1))
   "Returns a plist of tags with keys that are somewhat compatible with the MP3 ID3 tags."
   (let* ((comment (get-vorbis-comment handle link))
