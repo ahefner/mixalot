@@ -5,7 +5,10 @@
 (in-package :vorbisfile)
 
 (include "vorbis/vorbisfile.h")
-(cc-flags "-lvorbisfile")
+(cc-flags "-lvorbisfile"
+          ;; For MacPorts installation:
+          #+darwin "-I/opt/local/include/"
+          #+darwin "-L/opt/local/lib/")
 
 ;;;; Basic types
 

@@ -1,3 +1,4 @@
+
 (defpackage :mixalot-vorbis
   (:use :common-lisp :cffi :mixalot :vorbisfile)
   (:export #:vorbis-streamer
@@ -12,11 +13,12 @@
    (sample-rate :reader vorbis-sample-rate :initarg :sample-rate)
    (output-rate :reader vorbis-output-rate :initarg :output-rate)
    (filename  :initform nil :initarg filename)
-   (buffer    :initform nil :accessor buffer)
    (channels  :initform 0 :accessor channels :initarg :channels)
    (length    :initform nil)
    (position  :initform 0)
-   (seek-to   :initform nil)))
+   (seek-to   :initform nil)
+   (io-buffer      :initform nil :accessor io-buffer)
+   (convert-buffer :initform nil :accessor convert-buffer)))
 
 ;; Hmm, looks ugly...
 (defun open-vorbis-file (filename &key (output-rate 44100) (link 0))
@@ -31,9 +33,13 @@
           (progn
             (setf rate (get-vorbis-rate uhandle link)
                   channels (get-vorbis-channels uhandle link))
+            ;; XXX DUBIOUS
             (unless (= output-rate rate)
+              #+NIL
               (raise-vorbis-error "Open Ogg Vorbis file"
-                                  "Sample rate doesn't match requested rate."))
+                                  "Sample rate doesn't match requested rate.")
+              (warn "Sample rate doesn't match requested rate: ~:D vs expected ~:D"
+                    rate output-rate))
             (unless (or (= channels 2) (= channels 1))
               (raise-vorbis-error "Open Ogg Vorbis file"
                                   "Vorbis file is not mono or stereo."))
@@ -90,22 +96,31 @@
                            sample-rate)))))
 
 (defmethod streamer-mix-into ((streamer vorbis-streamer) mixer mix-buffer offset length time)
-  (declare (ignore time)
-           (optimize (speed 3))
+  (declare (ignorable time)
+           (optimize (speed 1) (debug 3))
            (type array-index offset length)
-           (type sample-vector mix-buffer))
+           (type sample-vector mix-buffer))  
   (update-for-seek streamer)
   (with-foreign-object (bitstream :int)
     (let* ((max-buffer-length 8192)
            (handle (vorbis-handle streamer))
            (channels (channels streamer))
            (frame-size (* 2 channels))
-           (read-buffer (or (buffer streamer)
-                            (setf (buffer streamer)
+           (read-buffer (or (io-buffer streamer)
+                            (setf (io-buffer streamer)
                                   (make-array max-buffer-length
-                                              :element-type (case channels
-                                                              (1 'mono-sample)
-                                                              (2 'stereo-sample)))))))
+                                              :element-type (ecase channels
+                                                              (1 '(signed-byte 16))
+                                                              (2 'stereo-sample))))))
+           (convert-buffer (or (convert-buffer streamer)
+                               (setf (convert-buffer streamer)
+                                     (if (eql channels 2)
+                                         read-buffer
+                                         (make-array max-buffer-length 
+                                                     :element-type 'stereo-sample))))))
+      #+NIL
+      (format *trace-output* "~&  streamer-mix-into vorbis-streamer offset=~A length=~A time=~A channels=~A~%"
+              offset length time channels)
       ;(declare (type sample-vector read-buffer))
       (mixalot:with-array-pointer (bufptr read-buffer)
         (loop with end-output-index = (the array-index (+ offset length))
@@ -114,21 +129,24 @@
               with samples-read = 0
               with chunk-size = 0
               while (< output-index end-output-index) do 
-
+              (assert (not (zerop frame-size)))
               (setf chunk-size (min max-buffer-length (- end-output-index output-index))
                     nread (ov-read handle bufptr (* frame-size chunk-size) 0 2 1 bitstream)
                     samples-read (the array-index (/ nread frame-size)))
 
-              (when (< nread 0) (loop-finish))
+              (when (<= nread 0) (loop-finish))
               
-              ;; Mix into buffer
-              (when (= 1 channels)
-                (setf read-buffer (mono->stereo read-buffer)))
+              ;; Convert mono
+              (when (eql 1 channels)
+                (loop for index from 0 below samples-read
+                   do (setf (aref convert-buffer index) 
+                            (mixalot:mono->stereo (aref read-buffer index)))))
+              ;; Mix into buffer 
               (loop for out-idx upfrom (the array-index output-index)
                     for in-idx upfrom 0
                     repeat samples-read
                     do (stereo-mixf (aref mix-buffer out-idx) 
-                                    (aref read-buffer in-idx)))
+                                    (aref convert-buffer in-idx)))
               (incf output-index samples-read)
               (incf (slot-value streamer 'position) samples-read)
 
