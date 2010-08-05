@@ -10,6 +10,7 @@
   :license "MIT-style license"
   :depends-on (:cffi)
   :serial t
-  :components ((:file "vorbisfile-package")
+  :components ((:file "strings-common")
+               (:file "vorbisfile-package")
                (cffi-grovel:grovel-file "vorbisfile-grovelling")
                (:file "vorbisfile")))

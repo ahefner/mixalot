@@ -266,22 +266,7 @@
           nconcing (list tag-keyword tag-value) into properties
           finally
           (setf (getf properties :track) (parse-integer (getf properties :track "0") :junk-allowed t))
-          (when (zerop (getf properties :track))
-            (remf properties :track))
-          ;; Remove tags for unknown artist or unknown disc, because that's a nuisance.
-          (when (member (getf properties :artist)
-                        '("Unknown" "Unknown Artist" "<Unknown>")
-                        :test #'equalp)
-            (remf properties :artist))
-          (when (or (member (getf properties :album)
-                            '("Unknown" "Unknown Disc" "<Unknown>")                      
-                            :test #'equalp)
-                    (eql 14 (mismatch "Unknown Album " (getf properties :album))))
-            (remf properties :album))
-            ;; This is particularly stupid:
-            (when (equalp "genre" (getf properties :genre))
-              (remf properties :genre))
-            (return properties))))
+          (return (clean-tags properties)))))
 
 (defun get-vorbis-tags-from-file (filename &optional (link -1))
   "Open an Ogg Vorbis file, retrieve the tags, and close it."

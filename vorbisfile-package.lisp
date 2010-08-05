@@ -1,9 +1,8 @@
 (defpackage :vorbisfile
-  (:use :common-lisp :cffi)
+  (:use :common-lisp :cffi :mixalot-strings-common)
   (:export #:vorbis-error
            #:vorbis-strerror
            #:check-vorbis-error
-           #:check-vorbis-pointer-error
            #:raise-vorbis-error
 
            #:vorbis-new
@@ -12,6 +11,7 @@
            #:vorbis-close
            #:vorbis-seek
 
+           #:get-vorbis-info
            #:get-vorbis-channels
            #:get-vorbis-length
            #:get-vorbis-rate
