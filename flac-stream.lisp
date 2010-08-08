@@ -132,11 +132,12 @@
           (error 'flac-error "Open FLAC file" "Don't know how to handle non-stereo streams"))
         (unless (= output-rate (setf rate (foreign-slot-value client-data 'flac-streamer-client-data 'sample-rate)))
           (warn "Sample rate doesn't match requested rate: ~:D vs expected ~:D" rate output-rate))
-        (rotatef handle uhandle)
+        (rotatef handle uhandle)) 
         (when uhandle
+          (flac-decoder-finish uhandle) 
           (flac-decoder-delete uhandle)
-          (foreign-free client-data))))
-    (values handle client-data))) 
+          (foreign-free client-data)))
+    (values handle client-data)))
 
 (defun flac-streamer-release-resources (flac-stream)
   "Release foreign resources associated with the flac-stream."
@@ -161,8 +162,11 @@
   "A fake read function.
   
   Make sure that at most the given amount of samples is ready in the stream buffer.
-  Return the amount of samples (at most the given amount)."
-
+  Return the amount of samples (at most the given amount).
+  
+  Seeking is only done after the last decoded block is played. I don't know if
+  this is a reasonable way of doing this, but I guess I'll find out once I
+  test seeking."
   (declare (optimize (speed 3)))
   (with-slots (buffer-position buffer handle) streamer
     (declare (type sample-vector buffer)
@@ -200,6 +204,15 @@
                           args)))
       stream)))
 
+(defun make-buffer (streamer buffer-length element-type)
+  (let ((buffer (make-array buffer-length
+                            :element-type element-type
+                            :initial-element 0)))
+    (setf (buffer streamer) buffer)
+    (mixalot:with-array-pointer (bufptr buffer)
+      (setf (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'client-buffer) bufptr))
+    buffer))
+
 (defmethod streamer-mix-into ((streamer flac-streamer) mixer mix-buffer offset length time)
   (declare (ignore time)
            (optimize (speed 3))
@@ -209,37 +222,32 @@
          (channels (flac-channels streamer))
          (max-buffer-length 8192)
          (read-buffer (or (buffer streamer)
-                          (setf (buffer streamer)
-                                (make-array max-buffer-length
-                                            :element-type 'stereo-sample
-                                            :initial-element 0)))))
+                          (make-buffer streamer max-buffer-length 'stereo-sample))))
     (declare (type sample-vector read-buffer))
-    (mixalot:with-array-pointer (bufptr read-buffer)
-      (setf (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'client-buffer) bufptr)
-      (with-slots (buffer-position position) streamer
-        (declare (type array-index buffer-position position))
-        (loop with end-output-index = (the array-index (+ offset length))
-              with output-index = offset
-              with chunk-size = 0
-              with samples-read = 0
-              while (< output-index end-output-index) do
+    (with-slots (buffer-position position) streamer
+      (declare (type array-index buffer-position position))
+      (loop with end-output-index = (the array-index (+ offset length))
+            with output-index = offset
+            with chunk-size = 0
+            with samples-read = 0
+            while (< output-index end-output-index) do
 
-              (setf chunk-size (min max-buffer-length (- end-output-index output-index))
-                    samples-read (the array-index (flac-read-samples streamer chunk-size)))
+            (setf chunk-size (min max-buffer-length (- end-output-index output-index))
+                  samples-read (the array-index (flac-read-samples streamer chunk-size)))
 
-              (when (flac-eof streamer) (loop-finish))
+            (when (flac-eof streamer) (loop-finish))
 
-              (loop for out-idx upfrom (the array-index output-index)
-                    for in-idx upfrom buffer-position
-                    repeat samples-read
-                    do (stereo-mixf (aref mix-buffer out-idx)
-                                    (aref read-buffer in-idx)))
-              (incf output-index samples-read)
-              (incf position samples-read)
-              (incf buffer-position samples-read)
-              finally
-              (when (flac-eof streamer)
-                (mixer-remove-streamer mixer streamer)))))))
+            (loop for out-idx upfrom (the array-index output-index)
+                  for in-idx upfrom buffer-position
+                  repeat samples-read
+                  do (stereo-mixf (aref mix-buffer out-idx)
+                                  (aref read-buffer in-idx)))
+            (incf output-index samples-read)
+            (incf position samples-read)
+            (incf buffer-position samples-read)
+            finally
+            (when (flac-eof streamer)
+              (mixer-remove-streamer mixer streamer))))))
 
 (defmethod streamer-cleanup ((stream flac-streamer) mixer)
   (declare (ignore mixer))
@@ -260,9 +268,10 @@
 (defmethod streamer-seek ((stream flac-streamer) mixer position 
                           &key &allow-other-keys)
   (declare (ignore mixer))
-  (with-slots (seek-to sample-rate output-rate) stream
-    (setf seek-to (floor (* sample-rate position) output-rate)))
-  (values))
+  (let ((sample-rate (flac-sample-rate stream)))
+    (with-slots (seek-to output-rate) stream
+      (setf seek-to (floor (* sample-rate position) output-rate)))
+    (values)))
 
 (defmethod streamer-position ((stream flac-streamer) mixer)
   (declare (ignore mixer))
