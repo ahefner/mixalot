@@ -72,3 +72,8 @@ encoding."
   (when (equalp "genre" (getf properties :genre))
     (remf properties :genre))
   (nconc properties))
+
+(defun trim-if-string (value)
+  (typecase value
+    (string (string-trim " " value))
+    (t value)))

@@ -1018,13 +1018,22 @@ while immediately doing some error checking. For all other functions, see
 
 <div class="def"><a name="vorbis-open">Function</a>
                        <b>vorbis-open</b> 
- <i>filename handle</i>
+ <i>filename handle <tt>&key</tt> (character-encoding :iso-8859-1)</i>
  <div class="docbody">
    <p>Open the file with the given <i>filename</i> and attach it to the given
    <i>handle</i>, which must have already been created using <a
    href="#vorbis-new"><tt>vorbis-new</tt></a>. This function calls the C
    function <tt>ov_fopen</tt>. If an error occurs, an error of type <a
    href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
+   <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
+   <tt>(latin-1)</tt> before being passed to C; to avoid encoding problems on
+   non-ASCII filenames, it is recommended you obtain the <i>filename</i>
+   string with this in mind. You can change this behavior using the
+   <tt>:character-encoding</tt> keyword, which can take any valid <a
+   href="http://common-lisp.net/project/babel/">Babel</a> encoding specifier
+   (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice
+   should be congruent with how the string was obtained from the filesystem).
+   </p>
  </div>
 </div>
 
@@ -1056,34 +1065,37 @@ while immediately doing some error checking. For all other functions, see
 
 <div class="def"><a name="vorbis-channels">Function</a>
                        <b>vorbis-channels</b> 
- <i>handle</i> &rArr; <i>number-of-channels</i>
+ <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>number-of-channels</i>
  <div class="docbody">
    <p>Returns an integer representing the <i>number-of-channels</i> in the
-   Vorbis stream given by <i>handle</i>. If an error occurs, an error of type
-   <a href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
+   Vorbis stream given by <i>handle</i> and logical stream <i>link</i> (-1 for
+   the current). If an error occurs, an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
 
  </div>
 </div>
 
 <div class="def"><a name="vorbis-rate">Function</a>
                        <b>vorbis-rate</b> 
- <i>handle</i> &rArr; <i>sampling-rate</i>
+ <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>sampling-rate</i>
  <div class="docbody">
    <p>Returns an integer representing the <i>sampling-rate</i> in Hz of the
-   Vorbis stream given by <i>handle</i>. If an error occurs, an error of type
-   <a href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
+   Vorbis stream given by <i>handle</i> and logical stream <i>link</i> (-1 for
+   the current). If an error occurs, an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
 
  </div>
 </div>
 
 <div class="def"><a name="vorbis-length">Function</a>
                        <b>vorbis-length</b> 
- <i>handle</i> &rArr; <i>total-number-of-samples</i>
+ <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>total-number-of-samples</i>
  <div class="docbody">
-   <p>Returns an integer representing the <i>total-number-of-samples</i> in the
-   Vorbis stream given by <i>handle</i>, by calling the C function
-   <tt>ov_pcm_total</tt>. If an error occurs, an error of type <a
-   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised</p>
+   <p>Returns an integer representing the <i>total-number-of-samples</i> in
+   the Vorbis stream given by <i>handle</i> and logical stream <i>link</i> (-1
+   for the current), by calling the C function <tt>ov_pcm_total</tt>. If an
+   error occurs, an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
 
  </div>
 </div>
@@ -1102,12 +1114,13 @@ while immediately doing some error checking. For all other functions, see
 
 <h3>Helpers</h3>
 
-<div class="def"><a name="get-tags-from-handle">Function</a>
-                       <b>get-tags-from-handle</b>
- <i>handle</i> &rArr; <i>plist</i>
+<div class="def"><a name="get-vorbis-tags-from-handle">Function</a>
+                       <b>get-vorbis-tags-from-handle</b>
+ <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>plist</i>
  <div class="docbody">
-   <p>Examines the comments from a vorbisfile <i>handle</i>,
-   returning a <i>plist</i> containing a subset of the following keys:</p>
+   <p>Examines the comments from a vorbisfile <i>handle</i> and the logical
+   stream <i>link</i> (-1 for the current), and returns a <i>plist</i>
+   containing a subset of the following keys:</p>
      <ul>
        <li><tt>:title</tt> </li>
        <li><tt>:artist</tt> </li>
@@ -1143,14 +1156,15 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 
-<div class="def"><a name="get-tags-from-file">Function</a>
-                       <b>get-tags-from-file</b> 
- <i>filename <!--<tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> --> &rArr; <i>plist</i>
+<div class="def"><a name="get-vorbis-tags-from-file">Function</a>
+                       <b>get-vorbis-tags-from-file</b> 
+ <i>filename <tt>&amp;key</tt> (link -1) (character-encoding :iso-8859-1) &rArr; <i>plist</i>
  <div class="docbody">
-   <p>Open an Ogg Vorbis file, examine its tags
-      using <a href="#get-tags-from-handle">get-tags-from-handle</a>,
-      and return the resulting <i>plist</i>.</p>
-   <!-- <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
+   <p>Open an Ogg Vorbis file, examine the tags for the given logical stream
+   <i>link</i> (-1 for the current), using <a
+   href="#get-vorbis-tags-from-handle">get-vorbis-tags-from-handle</a>, and
+   return the resulting <i>plist</i>.</p>
+   <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
       <tt>(latin-1)</tt> before being passed to C; to avoid encoding
       problems on non-ASCII filenames, it is recommended you obtain
       the <i>filename</i> string with this in mind. You can change this
@@ -1158,7 +1172,7 @@ while immediately doing some error checking. For all other functions, see
       <a href="http://common-lisp.net/project/babel/">Babel</a> encoding specifier
       (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice 
       should be congruent with how the string was obtained from the filesystem).
-   </p> -->
+   </p>
  </div>
 </div>
 

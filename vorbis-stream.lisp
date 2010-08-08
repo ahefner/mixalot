@@ -31,8 +31,8 @@
         (vorbis-open filename uhandle)
         (unwind-protect
           (progn
-            (setf rate (get-vorbis-rate uhandle link)
-                  channels (get-vorbis-channels uhandle link))
+            (setf rate (get-vorbis-rate uhandle :link link)
+                  channels (get-vorbis-channels uhandle :link link))
             ;; XXX DUBIOUS
             (unless (= output-rate rate)
               #+NIL
@@ -82,7 +82,7 @@
                          'filename filename
                          args)))
       (with-slots (length handle) stream
-        (let ((result (get-vorbis-length handle link)))
+        (let ((result (get-vorbis-length handle :link link)))
           (when (> result 0)
             (setf length result))))
       stream)))

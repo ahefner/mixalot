@@ -180,9 +180,10 @@
     (foreign-free handle)))
 
 ;; Open and close a vorbis file on the given handle
-(defun vorbis-open (filename handle)
+(defun vorbis-open (filename handle &key (character-encoding :iso-8859-1))
   "Open an Ogg Vorbis file and attach it to the given handle."
-  (check-vorbis-error "Open Ogg Vorbis file" (ov-fopen filename handle)))
+  (with-foreign-string (unmangled filename :encoding character-encoding)
+                       (check-vorbis-error "Open Ogg Vorbis file" (ov-fopen unmangled handle))))
 
 (defun vorbis-close (handle)
   "Close an Ogg Vorbis file by its handle."
@@ -200,19 +201,19 @@
 ;;;; Information
 
 ;; Information struct contains some parameters of the audio stream.
-(defun get-vorbis-info (handle &optional (link -1))
+(defun get-vorbis-info (handle &key (link -1))
   "Return vorbis-info of the specified handle and logical bitstream."
   (mem-ref (check-vorbis-pointer-error "Retrieving vorbis info" (ov-info handle link)) 'vorbis-info))
 
-(defun get-vorbis-channels (handle &optional (link -1))
+(defun get-vorbis-channels (handle &key (link -1))
   "Return the number of channels in a Vorbis stream."
-  (foreign-slot-value (get-vorbis-info handle link) 'vorbis-info 'channels))
+  (foreign-slot-value (get-vorbis-info handle :link link) 'vorbis-info 'channels))
 
-(defun get-vorbis-rate (handle &optional (link -1))
+(defun get-vorbis-rate (handle &key (link -1))
   "Return the sample-rate in Hz."
-  (foreign-slot-value (get-vorbis-info handle link) 'vorbis-info 'rate))
+  (foreign-slot-value (get-vorbis-info handle :link link) 'vorbis-info 'rate))
 
-(defun get-vorbis-length (handle &optional (link -1))
+(defun get-vorbis-length (handle &key (link -1))
   "Return the total number of samples in the physical stream. If link > 0,
   return the number of samples in that logical bitstream."
   (let ((err (ov-pcm-total handle link)))
@@ -227,7 +228,7 @@
 
 ;;;; Vorbis comments
 
-(defun get-vorbis-comment (handle &optional (link -1))
+(defun get-vorbis-comment (handle &key (link -1))
   "Return a vorbis-comment."
   (mem-ref (ov-comment handle link) 'vorbis-comment))
 
@@ -237,7 +238,7 @@
   (let ((length (foreign-slot-value comment 'vorbis-comment 'comments))
         (tags (foreign-slot-value comment 'vorbis-comment 'user-comments)))
     (loop for i upfrom 0 below length
-          collect (mem-aref tags :string i))))
+          collect (magic-string-conversion (mem-aref tags :pointer i)))))
 
 (defun get-vorbis-tag-value-from-raw-tags (tags tag-name)
   "Returns a tag's value from a list of raw tags."
@@ -253,9 +254,9 @@
 
 ;; This function contains some code from mpg123.lisp. I suggest the whole
 ;; tagging stuff is refactored.
-(defun get-vorbis-tags-from-handle (handle &optional (link -1))
+(defun get-vorbis-tags-from-handle (handle &key (link -1))
   "Returns a plist of tags with keys that are somewhat compatible with the MP3 ID3 tags."
-  (let* ((comment (get-vorbis-comment handle link))
+  (let* ((comment (get-vorbis-comment handle :link link))
          (raw-tags (get-vorbis-raw-tags-from-comment comment)))
     (loop for (tag-name tag-keyword) in
           ;; The field names are the proposed standard names for vorbis
@@ -275,10 +276,10 @@
           (setf (getf properties :track) (parse-integer (getf properties :track "0") :junk-allowed t))
           (return (clean-tags properties)))))
 
-(defun get-vorbis-tags-from-file (filename &optional (link -1))
+(defun get-vorbis-tags-from-file (filename &key (link -1) (character-encoding :iso-8859-1))
   "Open an Ogg Vorbis file, retrieve the tags, and close it."
   (with-foreign-object (handle 'vorbis-file)
-     (vorbis-open filename handle)
+     (vorbis-open filename handle :character-encoding character-encoding)
      (unwind-protect
-       (get-vorbis-tags-from-handle handle link)
+       (get-vorbis-tags-from-handle handle :link link)
        (vorbis-close handle))))

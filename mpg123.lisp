@@ -633,7 +633,8 @@ initialized the library can be used in a threaded fashion."
 
 (defvar *id3-no-unicode* nil
   "If true, always convert id3 values as ISO-8859-1.")
-#|
+
+#+NIL
 (defun safely-convert-string (c-string-ptr encoding 
                               &optional (max-length (1- array-total-size-limit)))
   "Safely convert a C string to a lisp string under the specified
@@ -647,6 +648,7 @@ encoding."
     (babel-encodings:character-coding-error ()
       nil)))
 
+#+NIL
 (defun magic-string-conversion (c-string-ptr)
   "Attempts to convert the pointer to a lisp string using UTF-8
   encoding. If that fails, converts it using ISO-8859-1. Returns two
@@ -656,7 +658,7 @@ encoding."
                     (safely-convert-string c-string-ptr :utf-8))))
     (cond (utf-8 (values utf-8 :utf-8))
           (t (safely-convert-string c-string-ptr :iso-8859-1)))))
-|#
+
 (defun nullify (sequence)
   (and (not (zerop (length sequence))) sequence))
 
@@ -672,6 +674,7 @@ encoding."
               (trim-if-string
                (magic-string-conversion (mpg123-string-data ptr) :no-utf8 *id3-no-unicode*))))))
 
+#+NIL
 (defun trim-if-string (value)
   (typecase value
     (string (string-trim " " value))
