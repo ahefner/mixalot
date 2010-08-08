@@ -11,7 +11,6 @@
            #:vorbis-close
            #:vorbis-seek
 
-           #:get-vorbis-info
            #:get-vorbis-channels
            #:get-vorbis-length
            #:get-vorbis-rate

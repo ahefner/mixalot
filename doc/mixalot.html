@@ -962,6 +962,15 @@ while immediately doing some error checking. For all other functions, see
  </div>
 </div>
 
+<div class="def"><a name="vorbis-strerror">Function</a>
+                       <b>vorbis-strerror</b>
+ <i>code</i> &rArr; <i>string</i>
+ <div class="docbody">
+   <p>Translate an integer <i>code</i> from the vorbisfile library into a
+   somewhat more descriptive <i>string</i>.</p>
+ </div>
+</div>
+
 <div class="def"><a name="check-vorbis-error">Function</a>
                        <b>check-vorbis-error</b> 
  <i>circumstance code</i>
@@ -971,9 +980,20 @@ while immediately doing some error checking. For all other functions, see
    signals an error of type <a href="#vorbis-error"><tt>vorbis-error</tt></a>.
    <i>Circumstance</i> is a string, included in the error report, intended to
    indicate which library call produced the error or what the programmer was
-   attempting to do.
-   </p>
+   attempting to do.</p>
  </div>
+</div>
+
+<div class="def"><a name="raise-vorbis-error">Function</a>
+                       <b>raise-vorbis-error</b>
+ <i>circumstance message</i>
+ <div class="docbody">
+   <p>Signal an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a>. <i>Circumstance</i> is a
+   string, included in the error report, intended to indicate which library
+   call produced the error or what the programmer was attempting to do.
+   <i>Message</i> is a string, included in the error report, that describes
+   why the call failed.</p> </div>
 </div>
 
 
@@ -998,44 +1018,84 @@ while immediately doing some error checking. For all other functions, see
 
 <div class="def"><a name="vorbis-open">Function</a>
                        <b>vorbis-open</b> 
- <i>filename handle</i> &rArr; <i>error-code</i>
+ <i>filename handle</i>
  <div class="docbody">
    <p>Open the file with the given <i>filename</i> and attach it to the given
    <i>handle</i>, which must have already been created using <a
    href="#vorbis-new"><tt>vorbis-new</tt></a>. This function calls the C
    function <tt>ov_fopen</tt>. If an error occurs, an error of type <a
-   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised. The returned
-   <i>error code</i> will be 0 upon success.</p>
-   <p><b>Note:</b> Does it even make sense to have <i>error code</i> returned,
-   or should it just return <i>handle</i>?</p>
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
  </div>
 </div>
 
 <div class="def"><a name="vorbis-close">Function</a>
                        <b>vorbis-close</b> 
- <i>handle</i> &rArr; <i>error-code</i>
+ <i>handle</i>
  <div class="docbody">
    <p>Open the file with the given <i>filename</i> and attach it to the given
    <i>handle</i>, using the C function <tt>ov_fopen</tt>. If an error occurs,
    an error of type <a href="#vorbis-error"><tt>vorbis-error</tt></a> is
-   raised. The returned <i>error code</i> will be 0 upon success.</p>
-   <p><b>Note:</b> Does it even make sense to have <i>error code</i> returned,
-   or should it just return <i>handle</i>?</p>
+   raised.</p>
 
  </div>
 </div>
 
 <div class="def"><a name="vorbis-seek">Function</a>
                        <b>vorbis-seek</b> 
- <i>handle position</i> &rArr; <i>error-code</i>
+ <i>handle position <tt>&amp;key</tt> (accurate t)</i>
  <div class="docbody">
    <p>In the Vorbis stream given by <i>handle</i>, seek to the given
    <i>position</i> in samples. This uses the C function
-   <tt>ov_pcm_seek_page_lap</tt>. If an error occurs, an error of type <a
-   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised. The returned
-   <i>error code</i> will be 0 upon success.</p> <p><b>Note:</b> Does it even
-   make sense to have <i>error code</i> returned, or should it just return
-   the new position or such?</p>
+   <tt>ov_pcm_seek_lap</tt> when <i>accurate</i> is <tt>t</tt>, and
+   <tt>ov_pcm_seek_page_lap</tt> when it is <tt>nil</tt>, which is faster. If
+   an error occurs, an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
+
+ </div>
+</div>
+
+<div class="def"><a name="vorbis-channels">Function</a>
+                       <b>vorbis-channels</b> 
+ <i>handle</i> &rArr; <i>number-of-channels</i>
+ <div class="docbody">
+   <p>Returns an integer representing the <i>number-of-channels</i> in the
+   Vorbis stream given by <i>handle</i>. If an error occurs, an error of type
+   <a href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
+
+ </div>
+</div>
+
+<div class="def"><a name="vorbis-rate">Function</a>
+                       <b>vorbis-rate</b> 
+ <i>handle</i> &rArr; <i>sampling-rate</i>
+ <div class="docbody">
+   <p>Returns an integer representing the <i>sampling-rate</i> in Hz of the
+   Vorbis stream given by <i>handle</i>. If an error occurs, an error of type
+   <a href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
+
+ </div>
+</div>
+
+<div class="def"><a name="vorbis-length">Function</a>
+                       <b>vorbis-length</b> 
+ <i>handle</i> &rArr; <i>total-number-of-samples</i>
+ <div class="docbody">
+   <p>Returns an integer representing the <i>total-number-of-samples</i> in the
+   Vorbis stream given by <i>handle</i>, by calling the C function
+   <tt>ov_pcm_total</tt>. If an error occurs, an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised</p>
+
+ </div>
+</div>
+
+<div class="def"><a name="vorbis-position">Function</a>
+                       <b>vorbis-position</b> 
+ <i>handle</i> &rArr; <i>sample-position</i>
+ <div class="docbody">
+   <p>Returns an integer representing the current <i>sample-position</i> in
+   the Vorbis stream given by <i>handle</i>, by calling the C function
+   <tt>ov_pcm_tell</tt>. If an error occurs, an error of type <a
+   href="#vorbis-error"><tt>vorbis-error</tt></a> is raised.</p>
 
  </div>
 </div>

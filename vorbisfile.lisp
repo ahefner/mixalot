@@ -156,10 +156,9 @@
 
 (defun check-vorbis-error (circumstance result)
   "Check if an error has occured in the vorbisfile library calls."
-  (if (< result 0)
+  (when (< result 0)
     (raise-vorbis-error circumstance
-                        (vorbis-strerror result))
-    result))
+                        (vorbis-strerror result))))
 
 (defun check-vorbis-pointer-error (circumstance pointer)
   "Check if an error has occured in the vorbisfile library calls pertaining to a pointer."
@@ -177,7 +176,7 @@
 
 (defun vorbis-delete (handle)
   "Delete an Ogg Vorbis handle."
-  (unless (null-pointer-p handle)
+  (unless (or (null handle) (null-pointer-p handle)) 
     (foreign-free handle)))
 
 ;; Open and close a vorbis file on the given handle
@@ -189,11 +188,14 @@
   "Close an Ogg Vorbis file by its handle."
   (check-vorbis-error "Close Ogg Vorbis file" (ov-clear handle)))
 
-;; seek-page-lap is nicer as a seek function, since it seeks fast (page) and
-;; laps so that (almost) no clicking is heard.
-(defun vorbis-seek (handle position)
+;; Seek to a specific position using lapping (less/no clicking), and when
+;; accurate is nil, it seeks faster. 
+(defun vorbis-seek (handle position &key (accurate t))
   "Seek (rougly) to the given position in samples."
-  (check-vorbis-error "Seeking in stream" (ov-pcm-seek-page-lap handle position)))
+  (check-vorbis-error "Seeking in stream"
+    (if accurate
+      (ov-pcm-seek-lap handle position)
+      (ov-pcm-seek-page-lap handle position))))
 
 ;;;; Information
 
@@ -213,13 +215,15 @@
 (defun get-vorbis-length (handle &optional (link -1))
   "Return the total number of samples in the physical stream. If link > 0,
   return the number of samples in that logical bitstream."
-  (check-vorbis-error "Retrieving number of samples"
-                         (ov-pcm-total handle link)))
+  (let ((err (ov-pcm-total handle link)))
+    (check-vorbis-error "Retrieving total number of samples" err)
+    err))
 
 (defun get-vorbis-position (handle)
   "Return the current position in samples."
-  (check-vorbis-error "Retrieving current position"
-                      (ov-pcm-tell handle)))
+  (let ((err (ov-pcm-tell handle)))
+    (check-vorbis-error "Retrieving current position" err)
+    err))
 
 ;;;; Vorbis comments
 
