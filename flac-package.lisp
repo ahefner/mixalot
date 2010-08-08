@@ -31,4 +31,6 @@
            #:flac-decoder-set-metadata-ignore-all
            #:flac-decoder-set-metadata-respond
            #:flac-decoder-seek
-           #:flac-decoder-get-decode-position))
+           #:flac-decoder-get-decode-position
+           
+           #:flac-seek))
