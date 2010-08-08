@@ -25,6 +25,9 @@
 (in-package :vorbisfile)
 
 (define-foreign-library libvorbisfile
+  (:darwin (:or "libvorbisfile.dylib" "libvorbisfile.3.dylib"
+                "/opt/local/lib/libvorbisfile.dylib"
+                "/opt/local/lib/libvorbisfile.3.dylib"))
   (:unix (:or "libvorbisfile.so.3"
               "/usr/lib/libvorbisfile.so"
               "/usr/local/lib/libvorbisfile.so"))
