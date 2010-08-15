@@ -7,4 +7,5 @@
   :depends-on (:cffi)
   :serial t
   :components ((:file "ffi-common")
+               (:file "strings-common")
                (:file "mpg123")))

@@ -23,7 +23,7 @@
 ;;;; OTHER DEALINGS IN THE SOFTWARE.
 
 (defpackage :mpg123 
-  (:use :common-lisp :cffi :mixalot-ffi-common)
+  (:use :common-lisp :cffi :mixalot-ffi-common :mixalot-strings-common)
   (:export
            #:mpg123-error
            #:check-mpg123-plain-error
@@ -634,6 +634,7 @@ initialized the library can be used in a threaded fashion."
 (defvar *id3-no-unicode* nil
   "If true, always convert id3 values as ISO-8859-1.")
 
+#+NIL
 (defun safely-convert-string (c-string-ptr encoding 
                               &optional (max-length (1- array-total-size-limit)))
   "Safely convert a C string to a lisp string under the specified
@@ -647,6 +648,7 @@ encoding."
     (babel-encodings:character-coding-error ()
       nil)))
 
+#+NIL
 (defun magic-string-conversion (c-string-ptr)
   "Attempts to convert the pointer to a lisp string using UTF-8
   encoding. If that fails, converts it using ISO-8859-1. Returns two
@@ -670,8 +672,9 @@ encoding."
        (let ((ptr (funcall v2-accessor v2)))
          (and (not (null-pointer-p ptr))
               (trim-if-string
-               (magic-string-conversion (mpg123-string-data ptr)))))))
+               (magic-string-conversion (mpg123-string-data ptr) :no-utf8 *id3-no-unicode*))))))
 
+#+NIL
 (defun trim-if-string (value)
   (typecase value
     (string (string-trim " " value))
@@ -736,7 +739,7 @@ encoding."
 (defun convert-mpg123-string (str)
   (let ((ptr (mpg123-string-data str)))
     (and (not (null-pointer-p ptr))
-         (magic-string-conversion ptr))))
+         (magic-string-conversion ptr :no-utf8 *id3-no-unicode*))))
 
 (defun dump-mpg123-text (group n text)
   (format t "~& ~7<~A~> ~D: lang=~4A id=~4A description=~W text=~W~%"
@@ -820,31 +823,17 @@ list."
                                     (property :track (get-track v1 v2))
                                     (property :genre (get-genre v1 v2))))
             ;; No such thing as track 0. Some files have track in comment field.
-            (when (eql 0 (getf properties :track)) (remf properties :track))
             (when (and (eql 6 (mismatch (getf properties :comment) "Track ")))
               (let ((tr (parse-integer (getf properties :comment) :start 6 :junk-allowed t)))
                 (when (and tr (> tr 0) (< tr 100))
                   (remf properties :comment)
                   (setf (getf properties :track) tr))))
-            ;; Remove tags for unknown artist or unknown disc, because that's a nuisance.
-            (when (member (getf properties :artist)
-                          '("Unknown" "Unknown Artist" "<Unknown>")
-                          :test #'equalp)
-              (remf properties :artist))
-            (when (or (member (getf properties :album)
-                              '("Unknown" "Unknown Disc" "<Unknown>")                      
-                              :test #'equalp)
-                      (eql 14 (mismatch "Unknown Album " (getf properties :album))))
-              (remf properties :album))
-            ;; This is particularly stupid:
-            (when (equalp "genre" (getf properties :genre))
-              (remf properties :genre))
             ;; Debugging: Print all text entries, if enabled
             (when (and print-misc-tags (not (null-pointer-p v2)))
               (dump-mpg123-texts "Comment" (id3v2-comment-list v2) (id3v2-comments v2))
               (dump-mpg123-texts "Text"    (id3v2-text v2)         (id3v2-texts v2))
               (dump-mpg123-texts "Extra"   (id3v2-extra v2)        (id3v2-extras v2)))
-            (return (nconc properties))))))
+            (return (clean-tags properties))))))
 
 (defun get-tags-from-file (filename &key 
                            verbose 
