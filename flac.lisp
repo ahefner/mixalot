@@ -248,19 +248,16 @@
             :bits-per-sample bits-per-sample
             :total-samples total-samples))))
 
-(defun vorbis-comment-raw-tags (vorbis-comment)
-  (with-foreign-slots ((num-comments comments) vorbis-comment flac-metadata-vorbis-comment)
-    (loop for i from 0 below num-comments
-          for comment-entry = (mem-aref comments 'flac-metadata-vorbis-comment-entry i)
-          collect (magic-string-conversion
-                    (foreign-slot-value comment-entry
-                                          'flac-metadata-vorbis-comment-entry 'entry)))))
-
 (defun flac-process-vorbis-comment (metadata)
   (let* ((vorbis-comment (foreign-slot-pointer
                            (foreign-slot-pointer metadata 'flac-metadata 'data)
                            'flac-metadata-data 'vorbis-comment)))
-    (vorbis-comment-raw-tags vorbis-comment)))
+    (with-foreign-slots ((num-comments comments) vorbis-comment flac-metadata-vorbis-comment)
+      (loop for i from 0 below num-comments
+            for comment-entry = (mem-aref comments 'flac-metadata-vorbis-comment-entry i)
+            collect (magic-string-conversion
+                      (foreign-slot-value comment-entry
+                                          'flac-metadata-vorbis-comment-entry 'entry))))))
 
 (defun flac-process-stream-info-by-type (metadata)
   (let ((type (flac-metadata-type metadata)))
