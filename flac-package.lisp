@@ -5,32 +5,21 @@
            #:flac-int32
            #:flac-uint64
 
-           #:flac-metadata
-           #:flac-metadata-data
-           #:flac-metadata-stream-info
-           #:flac-decoder-write-status
-           #:flac-decoder-error-status
-
-           #:metadataptr
-           #:handleptr
-           #:frameptr
-
            #:flac-strerror
            #:flac-error
 
-           #:flac-decoder-new
-           #:flac-decoder-delete
+           #:flac-open
+           #:flac-close
+           #:flac-eof
+           #:flac-read
+           #:flac-seek
+           #:flac-tell
+           #:flac-process-metadata
 
-           #:flac-decoder-init-file
-           #:flac-decoder-finish
+           #:flac-decoder-handle
+           #:flac-client-data
 
-           #:flac-decoder-get-state
-           #:flac-decoder-process-single
-           #:flac-decoder-process-until-end-of-metadata
-           #:flac-decoder-set-md5-checking
-           #:flac-decoder-set-metadata-ignore-all
-           #:flac-decoder-set-metadata-respond
-           #:flac-decoder-seek
-           #:flac-decoder-get-decode-position
-           
-           #:flac-seek))
+           #:flac-client-data-metadata
+           #:flac-client-data-buffer
+           #:flac-client-data-buffer-size
+           #:flac-client-data-block-size))

@@ -31,160 +31,91 @@
 
 (in-package :mixalot-flac)
 
-(defcstruct flac-streamer-client-data
-  (client-buffer :pointer)
-  (sample-rate flac::flac-unsigned) 
-  (channels flac::flac-unsigned)
-  (bits-per-sample flac::flac-unsigned) 
-  (block-size flac::flac-unsigned) 
-  (length flac::flac-uint64)) 
-
 (defclass flac-streamer ()
   ((handle      :reader flac-handle :initarg :handle)
+   (sample-rate :reader flac-sample-rate :initarg :sample-rate)
    (output-rate :reader flac-output-rate :initarg :output-rate)
-   (filename  :initform nil :initarg filename)
+   (filename  :initform nil :initarg :filename)
    (buffer    :initform nil :accessor buffer)
+   (channels :initform nil :reader flac-channels)
+   (min-buffer-length :initform 0)
    (buffer-position :initform 0 :accessor buffer-pos)
-   (client-data :initform nil :initarg :client-data :accessor flac-client-data)
+   (length    :initform nil)
    (position  :initform 0)
    (seek-to   :initform nil)))
 
-(defun flac-sample-rate (streamer)
-  (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'sample-rate)) 
-
-(defun flac-bits-per-sample (streamer)
-  (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'bits-per-sample)) 
-
-(defun flac-channels (streamer)
-  (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'channels)) 
-
-(defun flac-length (streamer)
-  (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'length)) 
-
-(defun flac-block-size (streamer)
-  (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'block-size)) 
-
-
 ;;;; Callbacks
-
-(defcallback write-callback
-             flac-decoder-write-status
-             ((handle handleptr)
-              (frame :pointer)
-              (buffer :pointer)
-              (client-data :pointer))
-  (with-foreign-slots ((client-buffer block-size) client-data flac-streamer-client-data)
-    (let* ((frame-header (foreign-slot-value frame 'flac::flac-frame 'flac::frame-header))
-           (channels (foreign-slot-value frame-header 'flac::flac-frame-header 'flac::channels)))
-      (setf block-size (foreign-slot-value frame-header 'flac::flac-frame-header 'flac::block-size))
-      (loop for block from 0 below block-size
-            do (loop for channel from 0 below channels
-                     do (setf (mem-aref client-buffer 'flac-int16 (+ (* channels block) channel))
-                              (mem-aref (mem-aref buffer :pointer channel) 'flac-int32 block))))
-      :write-continue)))
-
-(defcallback metadata-callback
-             :void
-             ((handle handleptr)
-              (metadata metadataptr)
-              (client-data :pointer))
-  (let ((type (foreign-slot-value metadata 'flac-metadata 'flac::type))
-        (data (foreign-slot-pointer metadata 'flac-metadata 'flac::data)))
-    (when (eql type :stream-info)
-      (let ((stream-info (foreign-slot-pointer data 'flac-metadata-data 'flac::stream-info)))
-        (with-foreign-slots ((flac::sample-rate flac::channels flac::bits-per-sample flac::total-samples) stream-info flac-metadata-stream-info)
-          (with-foreign-slots ((sample-rate channels bits-per-sample length) client-data flac-streamer-client-data)
-            (setf sample-rate flac::sample-rate
-                  channels flac::channels
-                  bits-per-sample flac::bits-per-sample
-                  length flac::total-samples))))))
-  nil)
-
-(defcallback error-callback
-             :void
-             ((handle handleptr)
-              (status flac-decoder-error-status)
-              (client-data :pointer))
-  (error 'flac-error "Stream decoder error from callback" (flac-strerror status))
-  nil)
 
 ;;;; Helper functions
 
 (defun open-flac-file (filename &key (output-rate 44100))
-  (let ((uhandle (flac-decoder-new))
-        (client-data (foreign-alloc 'flac-streamer-client-data))
-        rate
-        handle)
+  (let* ((uhandle (flac-open filename))
+         (stream-info (getf (flac-process-metadata uhandle) :stream-info))
+         rate
+         handle)
     (unwind-protect
       (progn
-        (flac-decoder-set-md5-checking uhandle 0)
-        (flac-decoder-set-metadata-ignore-all uhandle)
-        (flac-decoder-set-metadata-respond uhandle :stream-info)
-        (flac-decoder-init-file uhandle filename
-                                (callback write-callback)
-                                (callback metadata-callback)
-                                (callback error-callback)
-                                client-data)
-        (flac-decoder-process-until-end-of-metadata uhandle)
-        (unless (= 16 (foreign-slot-value client-data 'flac-streamer-client-data 'bits-per-sample))
-          (error 'flac-error "Open FLAC file" "Don't know how to handle non-16-bit samples"))
-        (unless (= 2 (foreign-slot-value client-data 'flac-streamer-client-data 'channels))
-          (error 'flac-error "Open FLAC file" "Don't know how to handle non-stereo streams"))
-        (unless (= output-rate (setf rate (foreign-slot-value client-data 'flac-streamer-client-data 'sample-rate)))
-          (warn "Sample rate doesn't match requested rate: ~:D vs expected ~:D" rate output-rate))
-        (rotatef handle uhandle)) 
-        (when uhandle
-          (flac-decoder-finish uhandle) 
-          (flac-decoder-delete uhandle)
-          (foreign-free client-data)))
-    (values handle client-data)))
+        (unless (= 16 (getf stream-info :bits-per-sample))
+          (error 'flac-error "Open FLAC file" "Expected 16-bit samples."))
+        (unless (= 2 (getf stream-info :channels))
+          (error 'flac-error "Open FLAC file" "Expected stereo samples."))
+        (unless (= output-rate (getf stream-info :sample-rate))
+          (warn "Sample-rate doesn't match requested rate: ~:D vs expected ~:D"
+                (getf stream-info :sample-rate) output-rate))
+        (rotatef handle uhandle))
+      (when uhandle
+        (flac-close uhandle)))
+    (values handle stream-info)))
 
 (defun flac-streamer-release-resources (flac-stream)
   "Release foreign resources associated with the flac-stream."
-  (with-slots (handle client-data) flac-stream
+  (with-slots (handle) flac-stream
     (when handle
-      (flac-decoder-finish handle)
-      (flac-decoder-delete handle)
-      (setf handle nil))
-    (when client-data
-      (foreign-free client-data)
-      (setf client-data nil))))
+      (flac-close handle)
+      (setf handle nil))))
 
 (defun update-for-seek (stream)
-  (with-slots (handle seek-to position output-rate sample-rate) stream
+  (with-slots (handle seek-to position output-rate sample-rate buffer-position) stream
     (when (and seek-to (flac-seek handle seek-to))
-      (with-foreign-object (pos 'flac::flac-uint64)
-        (flac-decoder-get-decode-position handle pos)
+      (let* ((client-data (flac-client-data handle))
+             (block-size (flac-client-data-block-size client-data)))
         (setf seek-to nil
-              position (floor (* output-rate (mem-ref pos 'flac::flac-uint64)) sample-rate))))))
+              buffer-position block-size ; fast-forward the buffer as well
+              position (floor (* output-rate (flac-tell handle)) sample-rate))))))
 
-(defun flac-read-samples (streamer samples)
-  "A fake read function.
-  
-  Make sure that at most the given amount of samples is ready in the stream buffer.
-  Return the amount of samples (at most the given amount).
-  
-  Seeking is only done after the last decoded block is played. I don't know if
-  this is a reasonable way of doing this, but I guess I'll find out once I
-  test seeking."
-  (declare (optimize (speed 3)))
-  (with-slots (buffer-position buffer handle) streamer
+(defun flac-streamer-read (stream samples)
+  "Fake read function.
+
+  Makes sure that at most the given amount of samples is ready in the streamer's buffer.
+  The buffer must then be read starting from the streamer's buffer-position, and only
+  for the length that is returned, even though more samples may be present."
+  (declare (type array-index samples)
+           (optimize (speed 3)))
+  (with-slots (buffer buffer-position handle) stream
     (declare (type sample-vector buffer)
              (type array-index buffer-position))
-    (when (= buffer-position (flac-block-size streamer))
-      (update-for-seek streamer)
-      (flac-decoder-process-single handle)
-      (setf buffer-position 0))
-    (min samples (- (flac-block-size streamer) buffer-position))))
+    (let* ((client-data (flac-client-data handle))
+           (block-size (flac-client-data-block-size client-data)))
+      (declare (type array-index block-size))
+      (when (= buffer-position block-size)
+        (mixalot:with-array-pointer (bufptr buffer)
+          (setf block-size (flac-read handle bufptr (length buffer))
+                buffer-position 0)))
+      (min samples (- block-size buffer-position)))))
 
-(defun flac-eof (streamer)
-  "Return true if the flac streamer is at its end and there is nothing in the buffer any more."
+(defun flac-streamer-eof (streamer)
+  "Fake eof function.
+
+  Checks if that the decoder is at the end of file, and that there's nothing in the
+  streamer's buffer any more."
   (declare (optimize (speed 3)))
-  (with-slots (buffer-position buffer handle) streamer
-    (declare (type sample-vector buffer)
-             (type array-index buffer-position))
-    (and (eql (flac-decoder-get-state handle) :end-of-stream)
-         (= buffer-position (flac-block-size streamer)))))
+  (with-slots (buffer-position handle) streamer
+    (declare (type array-index buffer-position))
+    (let* ((client-data (flac-client-data handle))
+           (block-size (flac-client-data-block-size client-data)))
+      (declare (type array-index block-size))
+      (and (flac-eof handle)
+           (= buffer-position block-size)))))
 
 (defun make-flac-streamer
     (filename &rest args 
@@ -192,37 +123,34 @@
      (output-rate 44100)
      (class 'flac-streamer)
      &allow-other-keys)
-  (multiple-value-bind (handle client-data)
+  (multiple-value-bind (handle stream-info)
     (open-flac-file filename :output-rate output-rate)
     (remf args :class)
     (let* ((stream (apply #'make-instance
                           class
                           :handle handle                         
-                          :client-data client-data
                           :output-rate output-rate
-                          'filename filename
+                          :filename filename
                           args)))
+      (with-slots (min-buffer-length length sample-rate channels) stream
+        (setf min-buffer-length (getf stream-info :maximum-block-size)
+              sample-rate (getf stream-info :sample-rate)
+              length (getf stream-info :total-samples)
+              channels (getf stream-info :channels)))
       stream)))
-
-(defun make-buffer (streamer buffer-length element-type)
-  (let ((buffer (make-array buffer-length
-                            :element-type element-type
-                            :initial-element 0)))
-    (setf (buffer streamer) buffer)
-    (mixalot:with-array-pointer (bufptr buffer)
-      (setf (foreign-slot-value (flac-client-data streamer) 'flac-streamer-client-data 'client-buffer) bufptr))
-    buffer))
 
 (defmethod streamer-mix-into ((streamer flac-streamer) mixer mix-buffer offset length time)
   (declare (ignore time)
            (optimize (speed 3))
            (type array-index offset length)
            (type sample-vector mix-buffer))
-  (let* ((handle (flac-handle streamer))
-         (channels (flac-channels streamer))
-         (max-buffer-length 8192)
+  (update-for-seek streamer)
+  (let* ((channels (flac-channels streamer))
+         (max-buffer-length 8192) ; we should check this is larger than min-buffer-length
          (read-buffer (or (buffer streamer)
-                          (make-buffer streamer max-buffer-length 'stereo-sample))))
+                          (setf (buffer streamer)
+                                (make-array max-buffer-length
+                                            :element-type 'stereo-sample)))))
     (declare (type sample-vector read-buffer))
     (with-slots (buffer-position position) streamer
       (declare (type array-index buffer-position position))
@@ -233,9 +161,9 @@
             while (< output-index end-output-index) do
 
             (setf chunk-size (min max-buffer-length (- end-output-index output-index))
-                  samples-read (the array-index (flac-read-samples streamer chunk-size)))
+                  samples-read (the array-index (flac-streamer-read streamer chunk-size)))
 
-            (when (flac-eof streamer) (loop-finish))
+            (when (flac-streamer-eof streamer) (loop-finish))
 
             (loop for out-idx upfrom (the array-index output-index)
                   for in-idx upfrom buffer-position
@@ -246,7 +174,7 @@
             (incf position samples-read)
             (incf buffer-position samples-read)
             finally
-            (when (flac-eof streamer)
+            (when (flac-streamer-eof streamer)
               (mixer-remove-streamer mixer streamer))))))
 
 (defmethod streamer-cleanup ((stream flac-streamer) mixer)
@@ -263,7 +191,8 @@
 
 (defmethod streamer-length ((stream flac-streamer) mixer)
   (declare (ignore mixer))
-  (flac-length stream))
+  (with-slots (length) stream 
+    length))
 
 (defmethod streamer-seek ((stream flac-streamer) mixer position 
                           &key &allow-other-keys)

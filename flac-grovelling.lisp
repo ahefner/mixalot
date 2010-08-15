@@ -11,14 +11,15 @@
 
 (ctype flac-int16 "FLAC__int16")
 (ctype flac-int32 "FLAC__int32")
+(ctype flac-uint32 "FLAC__uint32")
 (ctype flac-uint64 "FLAC__uint64")
 (ctype flac-bool "FLAC__bool")
 (ctype flac-unsigned "unsigned")
 
-(ctype flac-decoder-init-status "FLAC__StreamDecoderInitStatus")
-(ctype flac-decoder-error-status "FLAC__StreamDecoderErrorStatus")
+(ctype flac-stream-decoder-init-status "FLAC__StreamDecoderInitStatus")
+(ctype flac-stream-decoder-error-status "FLAC__StreamDecoderErrorStatus")
 
-(cenum flac-decoder-state
+(cenum flac-stream-decoder-state
   ((:search-for-metadata "FLAC__STREAM_DECODER_SEARCH_FOR_METADATA")
    :documentation "The decoder is ready to search for metadata.")
   ((:read-metadata "FLAC__STREAM_DECODER_READ_METADATA")
@@ -40,7 +41,7 @@
   ((:uninitialized "FLAC__STREAM_DECODER_UNINITIALIZED")
    :documentation "The decoder is in the uninitialized state; one of the FLAC__stream_decoder_init_*() functions must be called before samples can be processed."))
 
-(cenum flac-decoder-write-status
+(cenum flac-stream-decoder-write-status
  ((:write-continue "FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE")
   :documentation "The write was OK and decoding can continue.")
  ((:write-abort "FLAC__STREAM_DECODER_WRITE_STATUS_ABORT")
@@ -65,20 +66,30 @@
    :documentation "marker to denote beginning of undefined type range; this number will increase as new metadata types are added"))
 
 (cstruct flac-metadata-stream-info "FLAC__StreamMetadata_StreamInfo"
+  (minimum-block-size "min_blocksize" :type flac-unsigned)
+  (maximum-block-size "max_blocksize" :type flac-unsigned)
   (sample-rate "sample_rate" :type flac-unsigned)
   (channels "channels" :type flac-unsigned)
   (bits-per-sample "bits_per_sample" :type flac-unsigned)
   (total-samples "total_samples" :type flac-uint64))
 
+
+(cstruct flac-metadata-vorbis-comment-entry "FLAC__StreamMetadata_VorbisComment_Entry"
+  (length "length" :type flac-uint32)
+  (entry "entry" :type :string))
+
 ;(cvar "FLAC__StreamDecoderErrorStatusString" :pointer :read-only t)
 
-(cstruct flac-metadata-padding "FLAC__StreamMetadata_Padding")
-(cstruct flac-metadata-application "FLAC__StreamMetadata_Application")
-(cstruct flac-metadata-seektable "FLAC__StreamMetadata_SeekTable")
-(cstruct flac-metadata-vorbiscomment "FLAC__StreamMetadata_VorbisComment")
-(cstruct flac-metadata-cuesheet "FLAC__StreamMetadata_CueSheet")
-(cstruct flac-metadata-picture "FLAC__StreamMetadata_Picture")
-(cstruct flac-metadata-unknown "FLAC__StreamMetadata_Unknown")
+;(cstruct flac-metadata-padding "FLAC__StreamMetadata_Padding")
+;(cstruct flac-metadata-application "FLAC__StreamMetadata_Application")
+;(cstruct flac-metadata-seektable "FLAC__StreamMetadata_SeekTable")
+(cstruct flac-metadata-vorbis-comment "FLAC__StreamMetadata_VorbisComment"
+  (vendor-string "vendor_string" :type flac-metadata-vorbis-comment-entry)
+  (num-comments "num_comments" :type flac-uint32)
+  (comments "comments" :type :pointer))
+;(cstruct flac-metadata-cuesheet "FLAC__StreamMetadata_CueSheet")
+;(cstruct flac-metadata-picture "FLAC__StreamMetadata_Picture")
+;(cstruct flac-metadata-unknown "FLAC__StreamMetadata_Unknown")
 
 (cstruct flac-frame-header "FLAC__FrameHeader"
   (block-size "blocksize" :type flac-unsigned)

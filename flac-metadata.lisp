@@ -26,5 +26,4 @@
 
 (defcunion flac-metadata-data
   (stream-info flac-metadata-stream-info)
-  (padding flac-metadata-padding)
-  (application flac-metadata-application))
+  (vorbis-comment flac-metadata-vorbis-comment))
