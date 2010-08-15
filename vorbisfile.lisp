@@ -228,53 +228,23 @@
 
 ;;;; Vorbis comments
 
-(defun get-vorbis-comment (handle &key (link -1))
+(defun get-vorbis-comment-block (handle &key (link -1))
   "Return a vorbis-comment."
   (mem-ref (ov-comment handle link) 'vorbis-comment))
 
-(defun get-vorbis-raw-tags-from-comment (comment)
+(defun get-vorbis-comments-from-block (comment-block)
   "Returns all comments (without any processing) in a list. Most (all?) comments
   will be of the form KEY=VALUE, which can be considered as tags."
-  (let ((length (foreign-slot-value comment 'vorbis-comment 'comments))
-        (tags (foreign-slot-value comment 'vorbis-comment 'user-comments)))
+  (let ((length (foreign-slot-value comment-block 'vorbis-comment 'comments))
+        (tags (foreign-slot-value comment-block 'vorbis-comment 'user-comments)))
     (loop for i upfrom 0 below length
           collect (magic-string-conversion (mem-aref tags :pointer i)))))
 
-(defun get-vorbis-tag-value-from-raw-tags (tags tag-name)
-  "Returns a tag's value from a list of raw tags."
-  (let* ((tag-string (concatenate 'string tag-name "="))
-         (tag-length (length tag-string))
-         (tag-values
-           (loop for comment in tags
-                 when (and (< tag-length (length comment))
-                           (equalp (subseq comment 0 tag-length) tag-string))
-                 collect (subseq comment tag-length))))
-    (when tag-values
-      (format nil "~{~A~^, ~}" tag-values))))
-
-;; This function contains some code from mpg123.lisp. I suggest the whole
-;; tagging stuff is refactored.
 (defun get-vorbis-tags-from-handle (handle &key (link -1))
   "Returns a plist of tags with keys that are somewhat compatible with the MP3 ID3 tags."
-  (let* ((comment (get-vorbis-comment handle :link link))
-         (raw-tags (get-vorbis-raw-tags-from-comment comment)))
-    (loop for (tag-name tag-keyword) in
-          ;; The field names are the proposed standard names for vorbis
-          ;; comments. I just map them onto the keys as used in mpg123.lisp
-          ;; for ID3 tags as follows.
-          '(("TITLE" :title)
-            ("ARTIST" :artist)
-            ("ALBUM" :album)
-            ("DATE" :year) ; Post-processing should extract the year if a full date is given
-            ("TRACKNUMBER" :track)
-            ("GENRE" :genre)
-            ("DESCRIPTION" :comment))
-          as tag-value = (get-vorbis-tag-value-from-raw-tags raw-tags tag-name)
-          when tag-value
-          nconcing (list tag-keyword tag-value) into properties
-          finally
-          (setf (getf properties :track) (parse-integer (getf properties :track "0") :junk-allowed t))
-          (return (clean-tags properties)))))
+  (let* ((comment-block (get-vorbis-comment-block handle :link link))
+         (comments (get-vorbis-comments-from-block comment-block)))
+    (vorbis-comments-to-tags comments)))
 
 (defun get-vorbis-tags-from-file (filename &key (link -1) (character-encoding :iso-8859-1))
   "Open an Ogg Vorbis file, retrieve the tags, and close it."

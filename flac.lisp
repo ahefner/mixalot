@@ -195,7 +195,7 @@
 
 ;;; Opening and closing a file
 (defun flac-open (filename &key (character-encoding :iso-8859-1)
-                                (with-metadata '(:stream-info)))
+                                (with-metadata '(:stream-info :vorbis-comment)))
   (let* ((dec-handle (flac-stream-decoder-new))
          (data (foreign-alloc 'flac-client-data))
          (uhandle (make-instance 'flac-handle
@@ -251,9 +251,10 @@
 (defun vorbis-comment-raw-tags (vorbis-comment)
   (with-foreign-slots ((num-comments comments) vorbis-comment flac-metadata-vorbis-comment)
     (loop for i from 0 below num-comments
-          collect (foreign-slot-value
-                    (mem-aref comments 'flac-metadata-vorbis-comment-entry i)
-                    'flac-metadata-vorbis-comment-entry 'entry))))
+          for comment-entry = (mem-aref comments 'flac-metadata-vorbis-comment-entry i)
+          collect (magic-string-conversion
+                    (foreign-slot-value comment-entry
+                                          'flac-metadata-vorbis-comment-entry 'entry)))))
 
 (defun flac-process-vorbis-comment (metadata)
   (let* ((vorbis-comment (foreign-slot-pointer
@@ -331,49 +332,17 @@
 (defun flac-eof (handle)
   (eql (flac-stream-decoder-get-state (flac-decoder-handle handle)) :end-of-stream))
 
+(defun get-flac-tags-from-handle (handle)
+  "Returns a plist of tags with keys that are somewhat compatible with the MP3 ID3 tags."
+  (let* ((plist (flac-process-metadata handle))
+         (comments (getf plist :vorbis-comment)))
+    (vorbis-comments-to-tags comments)))
 
-#|
-(defun flac-init-read-buffer (handle &key (use-buffer nil))
-  (with-slots (client-data buffer-size buffer-position delete-buffer) handle
-    (unless use-buffer
-      (setf use-buffer (foreign-alloc 8192 'flac-int16)
-            delete-buffer t))
-    (setf (flac-client-data-buffer client-data) use-buffer
-          buffer-position 0)))
-
-
-
-(defun flac-read-samples (handle samples)
-  "A fake read function.
-  
-  Make sure that at most the given amount of samples is ready in the stream buffer.
-  Return the amount of samples (at most the given amount).
-  
-  Seeking is only done after the last decoded block is played. I don't know if
-  this is a reasonable way of doing this, but I guess I'll find out once I
-  test seeking."
-  (declare (optimize (speed 3)))
-  (with-slots (decoder-handle client-data buffer-position) handle
-    (declare (type sample-vector buffer)
-
-
-
-
-  (with-slots (buffer-position buffer handle) streamer
-    (declare (type sample-vector buffer)
-             (type array-index buffer-position))
-    (when (= buffer-position (flac-block-size streamer))
-      (update-for-seek streamer)
-      (flac-decoder-process-single handle)
-      (setf buffer-position 0))
-    (min samples (- (flac-block-size streamer) buffer-position))))
-
-(defun flac-eof (handle)
-  "Return true if the flac handle  is at its end and there is nothing in the buffer any more."
-  (declare (optimize (speed 3)))
-  (with-slots (buffer-position buffer handle) streamer
-    (declare (type sample-vector buffer)
-             (type array-index buffer-position))
-    (and (eql (flac-decoder-get-state handle) :end-of-stream)
-         (= buffer-position (flac-block-size streamer)))))
-|#
+(defun get-flac-tags-from-file (filename &key (character-encoding :iso-8859-1))
+  "Open a FLAC file, retrieve the tags, and close it."
+  (let* ((handle (flac-open filename
+                            :character-encoding character-encoding
+                            :with-metadata '(:vorbis-comment)))
+         (tags (get-flac-tags-from-handle handle)))
+    (flac-close handle)
+    tags))

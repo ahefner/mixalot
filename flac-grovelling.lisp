@@ -76,7 +76,7 @@
 
 (cstruct flac-metadata-vorbis-comment-entry "FLAC__StreamMetadata_VorbisComment_Entry"
   (length "length" :type flac-uint32)
-  (entry "entry" :type :string))
+  (entry "entry" :type :pointer))
 
 ;(cvar "FLAC__StreamDecoderErrorStatusString" :pointer :read-only t)
 

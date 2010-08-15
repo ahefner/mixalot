@@ -10,7 +10,8 @@
   :license "MIT-style license"
   :depends-on (:cffi)
   :serial t
-  :components ((:file "flac-package")
+  :components ((:file "strings-common")
+               (:file "flac-package")
                (cffi-grovel:grovel-file "flac-grovelling")
                (:file "flac-metadata")
                (cffi-grovel:grovel-file "flac-grovelling-metadata")

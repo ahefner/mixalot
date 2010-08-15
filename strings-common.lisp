@@ -27,7 +27,8 @@
   (:export #:safely-convert-string
            #:magic-string-conversion
 
-           #:clean-tags))
+           #:clean-tags
+           #:vorbis-comments-to-tags))
 
 (in-package :mixalot-strings-common)
 
@@ -54,7 +55,6 @@ encoding."
     (cond (utf-8-string (values utf-8-string :utf-8))
           (t (safely-convert-string c-string-ptr :iso-8859-1)))))
 
-
 (defun clean-tags (properties)
   (when (> 1 (getf properties :track))
     (remf properties :track))
@@ -77,3 +77,38 @@ encoding."
   (typecase value
     (string (string-trim " " value))
     (t value)))
+
+
+;;;; Convert vorbis comments to a tag plist. Not necessarily very efficient...
+(defun get-tag-from-vorbis-comments (vorbis-comments tag-name)
+  "Returns a tag's value from a list of raw tags."
+  (let* ((tag-string (concatenate 'string tag-name "="))
+         (tag-length (length tag-string))
+         (tag-values
+           (loop for comment in vorbis-comments
+                 when (and (< tag-length (length comment))
+                           (equalp (subseq comment 0 tag-length) tag-string))
+                 collect (subseq comment tag-length))))
+    (when tag-values
+      (format nil "~{~A~^, ~}" tag-values))))
+
+(defun vorbis-comments-to-tags (vorbis-comments)
+  "Convert a list of vorbis comments to a plist of tags with keys that are
+  somewhat compatible with the MP3 ID3 tags."
+  (loop for (tag-name tag-keyword) in
+        ;; The field names are the proposed standard names for vorbis
+        ;; comments. I just map them onto the keys as used in mpg123.lisp
+        ;; for ID3 tags as follows.
+        '(("TITLE" :title)
+          ("ARTIST" :artist)
+          ("ALBUM" :album)
+          ("DATE" :year) ; Post-processing should extract the year if a full date is given
+          ("TRACKNUMBER" :track)
+          ("GENRE" :genre)
+          ("DESCRIPTION" :comment))
+        as tag-value = (get-tag-from-vorbis-comments vorbis-comments tag-name)
+        when tag-value
+        nconcing (list tag-keyword tag-value) into properties
+        finally
+        (setf (getf properties :track) (parse-integer (getf properties :track "0") :junk-allowed t))
+        (return (clean-tags properties))))

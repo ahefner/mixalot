@@ -1,5 +1,5 @@
 (defpackage :flac
-  (:use :common-lisp :cffi)
+  (:use :common-lisp :cffi :mixalot-strings-common)
   (:export #:flac-bool
            #:flac-int16
            #:flac-int32
@@ -22,4 +22,7 @@
            #:flac-client-data-metadata
            #:flac-client-data-buffer
            #:flac-client-data-buffer-size
-           #:flac-client-data-block-size))
+           #:flac-client-data-block-size
+           
+           #:get-flac-tags-from-file
+           #:get-flac-tags-from-handle))
