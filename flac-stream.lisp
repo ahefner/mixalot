@@ -146,14 +146,14 @@
            (type sample-vector mix-buffer))
   (update-for-seek streamer)
   (let* ((channels (flac-channels streamer))
-         (max-buffer-length 8192) ; we should check this is larger than min-buffer-length
+         (max-buffer-length (max 8192 (slot-value streamer 'min-buffer-length)))
          (read-buffer (or (buffer streamer)
                           (setf (buffer streamer)
                                 (make-array max-buffer-length
                                             :element-type 'stereo-sample)))))
     (declare (type sample-vector read-buffer))
     (with-slots (buffer-position position) streamer
-      (declare (type array-index buffer-position position))
+      (declare (type array-index buffer-position position max-buffer-length))
       (loop with end-output-index = (the array-index (+ offset length))
             with output-index = offset
             with chunk-size = 0
