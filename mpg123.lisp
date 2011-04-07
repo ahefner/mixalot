@@ -672,13 +672,8 @@ encoding."
        (let ((ptr (funcall v2-accessor v2)))
          (and (not (null-pointer-p ptr))
               (trim-if-string
-               (magic-string-conversion (mpg123-string-data ptr) :no-utf8 *id3-no-unicode*))))))
-
-#+NIL
-(defun trim-if-string (value)
-  (typecase value
-    (string (string-trim " " value))
-    (t value)))
+               (magic-string-conversion (mpg123-string-data ptr) 
+                                        :no-utf8 *id3-no-unicode*))))))
 
 (defun get-id3v1-field (v1 v1-slot-name v1-field-width)
   (and (not (null-pointer-p v1))

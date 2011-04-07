@@ -26,6 +26,7 @@
   (:use :cl :cffi)
   (:export #:safely-convert-string
            #:magic-string-conversion
+           #:trim-if-string
 
            #:clean-tags
            #:vorbis-comments-to-tags))
@@ -56,28 +57,28 @@ encoding."
           (t (safely-convert-string c-string-ptr :iso-8859-1)))))
 
 (defun clean-tags (properties)
-  (when (> 1 (getf properties :track))
-    (remf properties :track))
-  ;; Remove tags for unknown artist or unknown disc, because that's a nuisance.
-  (when (member (getf properties :artist)
-                '("Unknown" "Unknown Artist" "<Unknown>")
-                :test #'equalp)
-    (remf properties :artist))
-  (when (or (member (getf properties :album)
-                    '("Unknown" "Unknown Disc" "<Unknown>")                      
-                   :test #'equalp)
-            (eql 14 (mismatch "Unknown Album " (getf properties :album))))
+  (destructuring-bind (&key track artist album genre &allow-other-keys) properties
+    (when (and (integerp track) (< track 1))
+      (remf properties :track))
+    ;; Remove tags for unknown artist or unknown disc, because that's a nuisance.
+    (when (member artist
+                  '("Unknown" "Unknown Artist" "<Unknown>")
+                  :test #'equalp)
+      (remf properties :artist))
+    (when (or (member album
+                      '("Unknown" "Unknown Disc" "<Unknown>")                      
+                      :test #'equalp)
+              (eql 14 (mismatch "Unknown Album " album)))
     (remf properties :album))
-  ;; This is particularly stupid:
-  (when (equalp "genre" (getf properties :genre))
-    (remf properties :genre))
-  (nconc properties))
+    ;; This is particularly stupid:
+    (when (equalp "genre" genre)
+      (remf properties :genre))
+    (nconc properties)))
 
 (defun trim-if-string (value)
   (typecase value
     (string (string-trim " " value))
     (t value)))
-
 
 ;;;; Convert vorbis comments to a tag plist. Not necessarily very efficient...
 (defun get-tag-from-vorbis-comments (vorbis-comments tag-name)
