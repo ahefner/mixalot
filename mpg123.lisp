@@ -818,7 +818,7 @@ list."
                                     (property :track (get-track v1 v2))
                                     (property :genre (get-genre v1 v2))))
             ;; No such thing as track 0. Some files have track in comment field.
-            (when (and (eql 6 (mismatch (getf properties :comment) "Track ")))
+            (when (prefix-p "Track " (getf properties :comment))
               (let ((tr (parse-integer (getf properties :comment) :start 6 :junk-allowed t)))
                 (when (and tr (> tr 0) (< tr 100))
                   (remf properties :comment)

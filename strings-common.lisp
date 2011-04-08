@@ -27,6 +27,7 @@
   (:export #:safely-convert-string
            #:magic-string-conversion
            #:trim-if-string
+           #:prefix-p
 
            #:clean-tags
            #:vorbis-comments-to-tags))
@@ -56,19 +57,25 @@ encoding."
     (cond (utf-8-string (values utf-8-string :utf-8))
           (t (safely-convert-string c-string-ptr :iso-8859-1)))))
 
+(defun prefix-p (prefix string)
+  (eql (length prefix) (mismatch prefix string)))
+
 (defun clean-tags (properties)
   (destructuring-bind (&key track artist album genre &allow-other-keys) properties
     (when (and (integerp track) (< track 1))
       (remf properties :track))
     ;; Remove tags for unknown artist or unknown disc, because that's a nuisance.
-    (when (member artist
-                  '("Unknown" "Unknown Artist" "<Unknown>")
-                  :test #'equalp)
+    (when (or (member artist
+                      '("Unknown" "Unknown Artist" "<Unknown>")
+                      :test #'equalp)
+              (prefix-p "New Artist" artist))
       (remf properties :artist))
     (when (or (member album
-                      '("Unknown" "Unknown Disc" "<Unknown>")                      
+                      '("Unknown" "Unknown Disc" "<Unknown>")
                       :test #'equalp)
-              (eql 14 (mismatch "Unknown Album " album)))
+              (prefix-p "New Album" album)
+              (prefix-p "New Title" album)
+              (prefix-p "Unknown Album " album))
     (remf properties :album))
     ;; This is particularly stupid:
     (when (equalp "genre" genre)
