@@ -146,13 +146,6 @@
   (foreign-slot-value metadata 'flac-metadata 'type))
 
 ;;;; Callbacks
-(defcallback write-callback-old
-             flac-stream-decoder-write-status
-             ((handle decoderptr)
-              (frame :pointer)
-              (buffer :pointer)
-              (client-data :pointer))
-  :write-abort)
 
 (defcallback write-callback
              flac-stream-decoder-write-status
@@ -166,7 +159,9 @@
            (channels (foreign-slot-value frame-header 'flac-frame-header 'channels)))
       (setf block-size (foreign-slot-value frame-header 'flac-frame-header 'block-size))
       (when (< buffer-size block-size)
-        (error 'flac-error "Write callback" "Buffer size smaller than block size"))
+        (error 'flac-error
+               :text (format nil "Write callback: Buffer size ~D smaller than block size ~D"
+                             buffer-size block-size)))
       (loop for block from 0 below block-size
             do (loop for channel from 0 below channels
                      do (setf (mem-aref buffer 'flac-int16 (+ (* channels block) channel))
@@ -178,9 +173,10 @@
              ((handle decoderptr)
               (status flac-stream-decoder-error-status)
               (client-data :pointer))
-  (declare (ignore handle client-data)
-           (optimize (speed 3)))
-  (error 'flac-error "Stream decoder error from callback" (flac-strerror status))
+  (declare (ignore handle client-data))
+  (unless (eql :lost-sync status)
+    (error 'flac-error
+           :text (format nil "FLAC decoder error from callback: ~A" status)))
   nil)
 
 (defcallback metadata-callback
@@ -315,7 +311,7 @@
 
 (defun flac-seek (handle sample)
   (let ((decoder-handle (flac-decoder-handle handle)))
-    (if (zerop (flac-stream-decoder-seek-absolute decoder-handle))
+    (if (zerop (flac-stream-decoder-seek-absolute decoder-handle sample))
       (when (eql (flac-stream-decoder-get-state decoder-handle) :seek-error)
         (flac-stream-decoder-flush decoder-handle)
         nil)
@@ -323,7 +319,7 @@
 
 (defun flac-tell (handle)
   (with-foreign-object (pos 'flac-uint64)
-    (flac-stream-decoder-get-position (flac-decoder-handle handle) pos)
+    (flac-stream-decoder-get-decode-position (flac-decoder-handle handle) pos)
     (mem-ref pos 'flac-uint64)))
 
 (defun flac-eof (handle)

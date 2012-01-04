@@ -17,7 +17,6 @@
 (ctype flac-unsigned "unsigned")
 
 (ctype flac-stream-decoder-init-status "FLAC__StreamDecoderInitStatus")
-(ctype flac-stream-decoder-error-status "FLAC__StreamDecoderErrorStatus")
 
 (cenum flac-stream-decoder-state
   ((:search-for-metadata "FLAC__STREAM_DECODER_SEARCH_FOR_METADATA")
@@ -64,6 +63,16 @@
    :documentation "PICTURE block")
   ((:undefined "FLAC__METADATA_TYPE_UNDEFINED")
    :documentation "marker to denote beginning of undefined type range; this number will increase as new metadata types are added"))
+
+(cenum flac-stream-decoder-error-status
+  ((:lost-sync "FLAC__STREAM_DECODER_ERROR_STATUS_LOST_SYNC")
+   :documentation "An error in the stream caused the decoder to lose synchronization.")
+  ((:bad-header "FLAC__STREAM_DECODER_ERROR_STATUS_BAD_HEADER")
+   :documentation "The decoder encountered a corrupted frame header.")
+  ((:frame-crc-mismatch "FLAC__STREAM_DECODER_ERROR_STATUS_FRAME_CRC_MISMATCH")
+   :documentation "The frame's data did not match the CRC in the footer.")
+  ((:unparseable-stream "FLAC__STREAM_DECODER_ERROR_STATUS_UNPARSEABLE_STREAM")
+   :documentation "The decoder encountered reserved fields in use in the stream."))
 
 (cstruct flac-metadata-stream-info "FLAC__StreamMetadata_StreamInfo"
   (minimum-block-size "min_blocksize" :type flac-unsigned)
