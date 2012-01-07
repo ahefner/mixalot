@@ -26,6 +26,8 @@
   (:use :common-lisp :cffi :mixalot-ffi-common :mixalot-strings-common)
   (:export
            #:mpg123-error
+           #:mpg123-plain-error
+           #:mpg123-handle-error
            #:check-mpg123-plain-error
            #:check-mh-error
            #:mpg123-strerror

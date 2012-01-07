@@ -61,8 +61,8 @@
   (vorbis-streamer-release-resources stream))
 
 (defun make-vorbis-streamer
-    (filename &rest args 
-     &key 
+    (filename &rest args
+     &key
      (output-rate 44100)
      (class 'vorbis-streamer)
      (link 0)
@@ -73,9 +73,9 @@
       (open-vorbis-file filename :output-rate output-rate :link link)
     (remf args :class)
     (remf args :link)
-    (let ((stream (apply #'make-instance 
+    (let ((stream (apply #'make-instance
                          class
-                         :handle handle                         
+                         :handle handle
                          :sample-rate sample-rate
                          :output-rate output-rate
                          :channels channels
@@ -89,7 +89,7 @@
 
 (defun update-for-seek (stream)
   (with-slots (handle seek-to position output-rate sample-rate) stream
-    (when seek-to 
+    (when seek-to
       (vorbis-seek handle seek-to)
      (setf seek-to nil
            position (floor (* output-rate (get-vorbis-position handle))
@@ -99,7 +99,7 @@
   (declare (ignorable time)
            (optimize (speed 1) (debug 3))
            (type array-index offset length)
-           (type sample-vector mix-buffer))  
+           (type sample-vector mix-buffer))
   (update-for-seek streamer)
   (with-foreign-object (bitstream :int)
     (let* ((max-buffer-length 8192)

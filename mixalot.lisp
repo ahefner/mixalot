@@ -6,7 +6,7 @@
 ;;;; a copy of this software and associated documentation files (the
 ;;;; "Software"), to deal in the Software without restriction, including
 ;;;; without limitation the rights to use, copy, modify, merge, publish,
-;;;; distribute, sublicense, and/or sellcopies of the Software, and to 
+;;;; distribute, sublicense, and/or sellcopies of the Software, and to
 ;;;; permit persons to whom the Software is furnished to do so, subject
 ;;;;  to the following conditions:
 
@@ -53,10 +53,10 @@
            #:mixer-remove-streamer
            #:mixer-remove-all-streamers
            #:create-mixer
-           #:destroy-mixer 
+           #:destroy-mixer
            #:array-index
            #:with-array-pointer
-           #:clamp-sample #:clamp-sample+ 
+           #:clamp-sample #:clamp-sample+
            #:mono->stereo #:stereo-left #:stereo-right
            #:%stereo-left #:%stereo-right
            #:split-sample
@@ -90,8 +90,8 @@
 
 (deftype stereo-sample () '(unsigned-byte 32))
 
-(deftype mono-sample () 
-  '(or 
+(deftype mono-sample ()
+  '(or
     (signed-byte 16)
     (unsigned-byte 16)))
 
@@ -122,7 +122,7 @@
 #+mixalot::use-alsa
 (defun check-error (circumstance result)
   (unless (zerop result)
-    (error 'alsa-error 
+    (error 'alsa-error
            :text (format nil "~A: ~A" circumstance (snd-strerror result)))))
 
 #+mixalot::use-alsa
@@ -155,11 +155,11 @@
     (validate-pointer (mem-ref pcm 'snd-pcm))))
 
 #+mixalot::use-alsa
-(defcfun snd-pcm-close :int 
+(defcfun snd-pcm-close :int
   (pcm snd-pcm))
 
 #+mixalot::use-alsa
-(defcenum snd-pcm-format 
+(defcenum snd-pcm-format
   (:snd-pcm-format-s16-le 2))
 
 #+mixalot::use-alsa
@@ -201,7 +201,7 @@
   (close   :int))
 
 #+mixalot::use-alsa
-(defcfun snd-pcm-dump :int 
+(defcfun snd-pcm-dump :int
   (pcm snd-pcm)
   (out snd-output))
 
@@ -227,7 +227,7 @@
 #+mixalot::use-alsa
 (defun call-with-pcm (rate continuation)
   (let ((pcm (snd-pcm-open "default" :playback :blocking)))
-    (unwind-protect 
+    (unwind-protect
          (progn
            (check-error
             "PCM set parameters"
@@ -237,7 +237,7 @@
            (funcall continuation pcm))
       (snd-pcm-close pcm))))
 
-;;;; Alternate interface using libao on OS X. 
+;;;; Alternate interface using libao. Tested on OS X, FreeBSD.
 
 ;;; This isn't ideal. You're forced to initialize the audio system
 ;;; (and thus the mixer) from the "main thread", due to OS X being a
@@ -292,7 +292,7 @@
            (ao-fmt-channels fmt) 2
            (ao-fmt-rate fmt) rate
            (ao-fmt-byte-format fmt) AO_FMT_LITTLE
-           (ao-fmt-matrix fmt) matrix) 
+           (ao-fmt-matrix fmt) matrix)
     (ao-open-live (ao-default-driver-id)
                    fmt
                    (null-pointer)))))
@@ -339,9 +339,9 @@
     (streamer-mix-into stream mixer buffer offset length time)))
 
 (defgeneric streamer-cleanup (stream mixer)
-  (:documentation 
+  (:documentation
   "Release resources and perform any other cleanups needed when a
-  streamer is destroyed as a result of a call to mixer-remove-streamer. 
+  streamer is destroyed as a result of a call to mixer-remove-streamer.
   Called outside the mixer lock, so it's okay to manipulate the mixer.")
   (:method (stream mixer)
     (declare (ignore stream mixer))))
@@ -405,7 +405,7 @@
 ;;; enough, and changing to that approach if/when I have use for it
 ;;; shouldn't break the API incompatibly.
 
-(defstruct mixer 
+(defstruct mixer
   (stream-lock (bordeaux-threads:make-lock "Mixer lock"))
   (stream-list  nil)
   (current-time 0)
@@ -437,7 +437,7 @@
 (defun mixer-remove-all-streamers (mixer)
   (with-mixer-lock (mixer)
     (dolist (streamer (mixer-stream-list mixer))
-      (%req-remove-streamer mixer streamer))))      
+      (%req-remove-streamer mixer streamer))))
 
 ;;; Obtaining a pointer to an array of unboxed data. I used to do this
 ;;; myself, but recentish CFFI can do it for me.
@@ -449,7 +449,7 @@
   ;; Perhaps does the wrong thing for displaced arrays.
   ;; This will never affect me.
   ;; Also, SBCL gives a very bizarre code deletion warning here
-  ;; when compiling the file in SLIME which goes away when I 
+  ;; when compiling the file in SLIME which goes away when I
   ;; compile just the definition.
   `((lambda (arrayoid body)
       (unless (typep arrayoid 'vector)
@@ -481,11 +481,11 @@
         (unless (eql :paused state)
           (vector-push-extend stream playable-streams))))))
 
-(defun remove-removable (mixer temp-vector)  
+(defun remove-removable (mixer temp-vector)
   (with-mixer-lock (mixer)
     (let ((state-table (mixer-stream-state mixer)))
       (setf (fill-pointer temp-vector) 0
-            (mixer-stream-list mixer) 
+            (mixer-stream-list mixer)
             (delete-if
              (lambda (streamer)
                (when (eql :remove (gethash streamer state-table))
@@ -540,8 +540,8 @@
           (fill buffer 0)
           (setf buffer-clear t))
         ;; Play the buffer.
-        #+mixalot::use-ao        
-        (let ((ret 
+        #+mixalot::use-ao
+        (let ((ret
                (with-array-pointer (ptr buffer)
                  (ao-play (mixer-device mixer) ptr (* 4 buffer-samples)))))
           (when (zerop ret)
@@ -559,7 +559,7 @@
                         (mixer-current-time mixer)
                         offset))
               (assert (integerp nframes))
-              (cond                
+              (cond
                 ((< nframes 0)
                  (format *trace-output* "~&nframes<0, snd-pcm-recover")
                  (snd-pcm-recover (mixer-device mixer) nframes 1))
@@ -585,7 +585,7 @@
   (error "Neither mixalot::use-ao nor mixalot::use-alsa existed on *features* when this function was compiled. That is wrong.")
   (let ((mixer (make-mixer :rate rate)))
     (bordeaux-threads:make-thread
-     (lambda ()       
+     (lambda ()
        #+mixalot::use-ao
        (progn
          (setf (mixer-device mixer) (open-ao :rate rate))
@@ -606,7 +606,7 @@
 ;;;; Fastish sample manipulation
 
 (declaim (inline stereo-sample sign-extend-16
-                 clamp-sample clamp-sample+ 
+                 clamp-sample clamp-sample+
                  mono->stereo stereo-left stereo-right
                  %stereo-left %stereo-right
                  split-sample
@@ -625,13 +625,13 @@
   (declare (optimize (speed 3))
            (type (unsigned-byte 16) x))
   (let ((c (ash -1 15)))
-    (logxor (+ x c) c)))  
+    (logxor (+ x c) c)))
 
 (defun %stereo-left (sample)
   (declare (optimize (speed 3)) (type stereo-sample sample))
   (ldb (byte 16 0)  sample))
 
-(defun %stereo-right (sample) 
+(defun %stereo-right (sample)
   (declare (optimize (speed 3)) (type stereo-sample sample))
   (ldb (byte 16 16)  sample))
 
@@ -639,7 +639,7 @@
   (declare (optimize (speed 3)) (type stereo-sample sample))
   (sign-extend-16 (%stereo-left  sample)))
 
-(defun stereo-right (sample) 
+(defun stereo-right (sample)
   (declare (optimize (speed 3)) (type stereo-sample sample))
   (sign-extend-16 (%stereo-right sample)))
 
@@ -655,7 +655,7 @@
   (stereo-sample (clamp-sample+ (stereo-left  x) (stereo-left  y))
                  (clamp-sample+ (stereo-right x) (stereo-right y))))
 
-(defun add-stereo-samples (x y) 
+(defun add-stereo-samples (x y)
   "Add two stereo samples, without clipping."
   (declare (optimize (speed 3)) (type stereo-sample x y))
   (logior (logand #xFFFF (+ x y))
@@ -695,7 +695,7 @@
             with freq = (+ 200 (* n 200))
             with dp = (* 2.0 pi freq 1/44100)
             as sample = (round (* 5000 (sin phase)))
-            do            
+            do
             (stereo-incf (aref buffer index) (mono->stereo sample))
             (incf phase dp))
       (incf n)
@@ -714,7 +714,7 @@
              finally (setf position vector-index))
        (when (= (the array-index position) end)
          (mixer-remove-streamer mixer ,vstreamer))))
-  
+
 (defclass vector-streamer ()
   ((vector :reader vector-of :initarg :vector)
    (start  :reader start     :initarg :start)
@@ -733,8 +733,8 @@
      (defclass ,name (vector-streamer) ())
      (defun ,(intern (format nil "MAKE-~A" (symbol-name name)))
          (vector &optional (start 0) (end (length vector)))
-       (make-instance ',name :vector vector 
-                      :start start :end end 
+       (make-instance ',name :vector vector
+                      :start start :end end
                       :position start
                       :elts-per-sample ,step))
      (defmethod streamer-mix-into ((stream ,name) mixer buffer offset length time)
@@ -763,11 +763,11 @@
     vector 1 (aref vector vector-index))
 
 (define-vector-streamer  fast-vector-streamer-mono
-    (simple-array (signed-byte 16) 1) 1 
+    (simple-array (signed-byte 16) 1) 1
     (mono->stereo (aref vector vector-index)))
 
-(define-vector-streamer  fast-vector-streamer-interleaved-stereo 
-    (simple-array (signed-byte 16) 1) 2 
+(define-vector-streamer  fast-vector-streamer-interleaved-stereo
+    (simple-array (signed-byte 16) 1) 2
     (stereo-sample (aref vector vector-index)
                    (aref vector (1+ vector-index))))
 

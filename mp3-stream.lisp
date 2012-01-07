@@ -6,7 +6,7 @@
 ;;;; a copy of this software and associated documentation files (the
 ;;;; "Software"), to deal in the Software without restriction, including
 ;;;; without limitation the rights to use, copy, modify, merge, publish,
-;;;; distribute, sublicense, and/or sellcopies of the Software, and to 
+;;;; distribute, sublicense, and/or sellcopies of the Software, and to
 ;;;; permit persons to whom the Software is furnished to do so, subject
 ;;;;  to the following conditions:
 
@@ -81,8 +81,8 @@ mpg123_handle pointer if successful."
   (mp3-streamer-release-resources stream))
 
 (defun make-mp3-streamer
-    (filename &rest args 
-     &key 
+    (filename &rest args
+     &key
      (output-rate 44100)
      (class 'mp3-streamer)
      (prescan t)
@@ -93,9 +93,9 @@ the file cannot be opened or another error occurs."
       (open-mp3-file filename :output-rate output-rate :prescan prescan)
     (remf args :class)
     (remf args :prescan)
-    (let ((stream (apply #'make-instance 
+    (let ((stream (apply #'make-instance
                          class
-                         :handle handle                         
+                         :handle handle
                          :sample-rate sample-rate
                          :output-rate output-rate
                          'filename filename
@@ -108,7 +108,7 @@ the file cannot be opened or another error occurs."
 
 (defun update-for-seek (stream)
   (with-slots (handle seek-to position output-rate sample-rate) stream
-    (when seek-to 
+    (when seek-to
       (mpg123-seek handle seek-to :set)
      (setf seek-to nil
            position (floor (* output-rate (mpg123-tell handle))
@@ -134,19 +134,19 @@ the file cannot be opened or another error occurs."
               with err = 0
               with samples-read = 0
               with chunk-size = 0
-              while (< output-index end-output-index) do 
+              while (< output-index end-output-index) do
 
               (setf chunk-size (min max-buffer-length (- end-output-index output-index))
                     err (mpg123-read handle bufptr (* 4 chunk-size) nread)
                     samples-read (the array-index (ash (mem-ref nread 'mpg123::size_t) -2)))
 
               (when (not (zerop err)) (loop-finish))
-              
+
               ;; Mix into buffer
               (loop for out-idx upfrom (the array-index output-index)
                     for in-idx upfrom 0
                     repeat samples-read
-                    do (stereo-mixf (aref mix-buffer out-idx) 
+                    do (stereo-mixf (aref mix-buffer out-idx)
                                     (aref read-buffer in-idx)))
               (incf output-index samples-read)
               (incf (slot-value streamer 'position) samples-read)
@@ -156,8 +156,8 @@ the file cannot be opened or another error occurs."
                 ((= err MPG123_DONE) ; End of stream.
                  (mixer-remove-streamer mixer streamer))
                 ((/= err 0)  ; Other error?
-                 (format *trace-output* "~&~A (~A): error ~A: ~A~%" 
-                         streamer 
+                 (format *trace-output* "~&~A (~A): error ~A: ~A~%"
+                         streamer
                          (slot-value streamer 'filename)
                          err
                          (mpg123-strerror handle))
@@ -172,10 +172,10 @@ the file cannot be opened or another error occurs."
 
 (defmethod streamer-length ((stream mp3-streamer) mixer)
   (declare (ignore mixer))
-  (with-slots (length) stream 
+  (with-slots (length) stream
     length))
 
-(defmethod streamer-seek ((stream mp3-streamer) mixer position 
+(defmethod streamer-seek ((stream mp3-streamer) mixer position
                           &key &allow-other-keys)
   (declare (ignore mixer))
   (with-slots (seek-to sample-rate output-rate) stream
