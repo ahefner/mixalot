@@ -11,7 +11,7 @@
 <body>
 
 <h1>Mixalot User Manual</h1>
-<p>Version 0.0.3</p>
+<p>Version 0.0.4</p>
 
 <!-- Contents -->
 
@@ -37,10 +37,7 @@
         </ul>
       </li>
 
-      <li><a href="#mix_VectorStreamers">Vector Streamers</a>
-
-      </li>
-      
+      <li><a href="#mix_VectorStreamers">Vector Streamers</a></li>
       <li><a href="#mix_SampleManipulation">Sample Manipulation</a>
 
       </li>
@@ -62,13 +59,15 @@
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="Introduction"></a>Introduction</h2>
 
-<p>Mixalot is a grab bag of systems related to audio in Common Lisp
+<p>Mixalot is a collection of systems related to audio in Common Lisp,
 under an MIT-style license. Currently it consists of a mixer component
-providing straightforward audio output on Linux (via ALSA) and other platforms
-(using <a href="http://xiph.org/ao/">libao</a>),
-a <a href="http://common-lisp.net/project/cffi/">CFFI</a> binding to
-the libmpg123 library, and a helper component allowing playback of MP3
-files through the mixer.</p>
+providing real-time audio output on Linux (via ALSA) and other
+platforms (using <a href="http://xiph.org/ao/">libao</a>),
+a <a href="http://common-lisp.net/project/cffi/">CFFI</a> bindings to
+the <a href="http://www.mpg123.de/api/">libmpg123</a>, <a href="http://flac.sourceforge.net/">libFLAC</a>,
+and <a href="http://xiph.org/vorbis/doc/vorbisfile/index.html">libvorbisfile</a>
+libraries, and audio stream classes for simple playback of MP3, Ogg,
+and FLAC files through the mixer.</p>
 
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="Installation"></a>Installation</h2>
@@ -76,7 +75,6 @@ files through the mixer.</p>
 <p>The most recent development version of Mixalot is hosted on <a href="http://github.com/ahefner/mixalot">github</a> and can be obtained as follows:</p>
 <pre class="lisp">
 git clone git://github.com/ahefner/mixalot.git</pre>
-The latest stable release is 0.0.2a and can be downloaded from <a href="http://vintage-digital.com/hefner/software/mixalot/mixalot-0.0.2a.tar.gz">http://vintage-digital.com/hefner/software/mixalot/mixalot-0.0.2a.tar.gz</a>. </p>
 
 <p>Mixalot includes several ASDF systems which should be symlinked into the ASDF central registry in the usual fashion. It depends directly on the following systems:</p>
 <ul>
@@ -88,9 +86,10 @@ The latest stable release is 0.0.2a and can be downloaded from <a href="http://v
 <p>You may find this library useful for the following purposes:</p>
 <ul>
   <li>Audio output, if you aren't overly concerned with latency</li>
-  <li>Decoding an mp3 file to a vector in memory</li>
-  <li>Playing an mp3 file</li>
-  <li>Querying id3 tags</li>
+  <li>Playing MP3, Ogg, or FLAC files</li>
+  <li>Decoding audio files to a vector in memory</li>
+  <li>Querying ID3 tags from MP3 files</li>
+  <li>Querying tags from FLAC and Ogg Vorbis files</li>
 </ul>
 
 
@@ -103,11 +102,15 @@ at compile time to use ALSA (on Linux)
 or <a href="http://xiph.org/ao/">libao</a> (everywhere else) and
 should be able to produce audio on any platform supported by libao. In
 order to be useful in an application, the mixer must also run in its
-own (native) thread. 
-Therefore, the <tt>mixalot</tt> and <tt>mixalot-mp3</tt> systems should be usable on CL implementations capable of running multiple threads, on Linux or platforms supported by libao. It has been tested and is known to work in the following configurations:</p>
+own (native) thread.  Therefore, the <tt>mixalot</tt>
+and <tt>mixalot-mp3</tt> systems should be usable on CL
+implementations capable of running multiple threads, on Linux or
+platforms supported by libao. It has been tested and is known to work
+in the following configurations:</p>
 <ul>
   <li>SBCL (w/sb-thread enabled) on Linux/x86 and Linux/x86-64</li>
   <li>SBCL (w/sb-thread enabled) on Mac OS X 10.6.3 (x86_64)</li>
+  <li>SBCL (w/sb-thread enabled) on FreeBSD 8.2 (amd64)</li>
   <li>Clozure CL on Linux/x86_64</li>
 </ul>
 It has been tested on the following platforms and found not to work:
@@ -1135,13 +1138,14 @@ while immediately doing some error checking. For all other functions, see
      <p>For all keys except <tt>:track</tt>, the property value will
      be a string. If <tt>:track</tt> is present, it will be an
      integer.</p>
-     <p>For the key <tt>:year</tt>, the property value will in fact contain 
+     <p>For the key <tt>:year</tt>, the property value will in fact contain
      the value of the <tt>DATE</tt> field in the vorbis comments. Similarly,
      the property value for the <tt>:track</tt> key will contain the value of
-     the <tt>TRACKNUMBER</tt> field in the Vorbis comments. This maps the
-     vorbis comments well onto ID3 tags in MP3 files. Some heuristics are
+     the <tt>TRACKNUMBER</tt> field in the Vorbis comments. In this way,
+     Vorbis comments are massaged to resemble ID3 tag values as retrieved using
+     <a href="#get-tags-from-handle">get-tags-from-handle</a>. Some heuristics are
      applied to correct or reject obviously incorrect property values.
-     Specifically, track numbers of zero are removed from the
+     For instance, track numbers of zero are removed from the
      <i>plist</i>. Additionally, for Vorbis comments it is recommended to use
      multiple values of the <tt>ARTIST</tt> field if necessary. Such
      occurences are collected under one <tt>:artist</tt> key, with the values
@@ -1159,7 +1163,7 @@ while immediately doing some error checking. For all other functions, see
 
 
 <div class="def"><a name="get-vorbis-tags-from-file">Function</a>
-                       <b>get-vorbis-tags-from-file</b> 
+                       <b>get-vorbis-tags-from-file</b>
  <i>filename</i> <tt>&amp;key</tt> (link -1) (character-encoding :iso-8859-1) &rArr; <i>plist</i>
  <div class="docbody">
    <p>Open an Ogg Vorbis file, examine the tags for the given logical stream
@@ -1189,7 +1193,7 @@ at this moment, only mono and stereo Ogg Vorbis files with a sampling rate of
 <tt>mixalot-vorbis</tt> package:</p>
 
 <div class="def"><a name="vorbis-streamer">Class</a>
-                       <b>vorbis-streamer</b> 
+                       <b>vorbis-streamer</b>
  <div class="docbody">
    <p>A seekable Mixalot streamer for playing Ogg Vorbis files.</p>
  </div>
@@ -1250,19 +1254,15 @@ CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
 </pre>
 
 <!--  ----------------------------------------------------------------- -->
-<h2><a name="flac-ffi"></a>System: flac-ffi</h2>
+<h2><a name="flac"></a>System: flac</h2>
 
-<p>The <tt>flac-ffi</tt> system presents a wrapper around libFLAC. As can be
-seen from the original <a
-href="http://flac.sourceforge.net/api/index.html">libFLAC documentation</a>, 
-the API of the library requires the use of callbacks etc., which would only
-make the use of the ffi for mixalot's purposes difficult. As such, the
-<tt>flac-ffi</tt> system exports only functions that make reading a FLAC file
-relatively easy.</p>
+<p>The <tt>flac</tt> system implements an FFI wrapper and utility
+functions around libFLAC. These are used internally by
+the <tt>mixalot-flac</tt> package, but several exports may be of
+general interest.
+</p>
 
-<p>The functions that are provided, allow for opening a FLAC file, reading
-some of the metadata including vorbis comments, decoding the audio into a
-buffer, seeking and safely closing the file.</p>
+<p>Previous versions of Mixalot advertised a number of additional symbols from this package. Internal changes necessitated modifying these interfaces. If you have need of the previously offered functionality, contact the authors.</p>
 
 <div class="def"><a name="flac-error">Condition</a>
                        <b>flac-error</b>
@@ -1271,149 +1271,11 @@ buffer, seeking and safely closing the file.</p>
  </div>
 </div>
 
-<div class="def"><a name="flac-strerror">Function</a>
-                       <b>flac-strerror</b>
- <i>code</i> &rArr; <i>string</i>
+<div class="def"><a name="get-flac-tags-from-file">Function</a>
+                       <b>get-flac-tags-from-file</b>
+ <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
  <div class="docbody">
-   <p>Translate an integer <i>code</i> from the FLAC library into a
-   somewhat more descriptive <i>string</i>. Specifically, this uses
-   <tt>FLAC__StreamDecoderErrorStatusString</tt> from the libFLAC API.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-handle">Class</a>
-                       <b>flac-handle</b> 
- <div class="docbody">
-   <p>A handle to a FLAC file. This contains both the handle to the FLAC
-   stream decoder, as well as some client data that is used by the internally
-   defined callbacks.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-open">Function</a>
-                       <b>flac-open</b>
- <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1) (with-metadata
- '(:stream-info :vorbis-comment))</i> &rArr; <i>handle</i>
- <div class="docbody">
-   <p>Open the FLAC file <i>filename</i> and return a new <a
-   href="#flac-handle">flac-handle</a>.</p>
-   <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
-   <tt>(latin-1)</tt> before being passed to C; to avoid encoding problems on
-   non-ASCII filenames, it is recommended you obtain the <i>filename</i>
-   string with this in mind. You can change this behavior using the
-   <tt>:character-encoding</tt> keyword, which can take any valid <a
-   href="http://common-lisp.net/project/babel/">Babel</a> encoding specifier
-   (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice
-   should be congruent with how the string was obtained from the filesystem).
-   </p>
-   <p>The decoder is also instructed by default that it should process the
-   metadata of types <tt>:stream-info</tt> and <tt>:vorbis-comment</tt>. While
-   it's perfectly possible to work with a FLAC file and skipping
-   <tt>:vorbis-comment</tt> processing, it's strongly recommended to at the
-   very least use <tt>:stream-info</tt> since it contains important
-   information regarding the stream. See <a
-   href="#flac-process-metadata">flac-process-metadata</a>.</p>
-   </div>
-</div>
-
-<div class="def"><a name="flac-close">Function</a>
-                       <b>flac-close</b>
- <i>handle</i>
- <div class="docbody">
-   <p>Close the <i>handle</i> and release all foreign resources associated
-   with it.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-process-metadata">Function</a>
-                       <b>flac-process-metadata</b> 
- <i>handle</i> &rArr; <i>metadata-plist</i>
- <div class="docbody">
-   <p>For a given <i>handle</i>, process the metadata and return it as
-   <i>metadata-plist</i>. It is strongly recommended to make this the first
-   operation to perform on a new <a href="#flac-handle">flac-handle</a> that
-   was acquired with <a href="#flac-open">flac-open</a>. The returned
-   <i>metadata-plist</i> will contain the metadata that was requested in the
-   call to <a href="#flac-open">flac-open</a>, as a plist. The possible keys
-   in this plist are the only metadata types that are currently recognized and
-   processed:</p>
-   <ul>
-     <li><tt>:stream-info</tt></li>
-     <li><tt>:vorbis-comment</tt></li>
-   </ul>
-   <p>The value for <tt>:stream-info</tt> key is itself another plist, with
-   the following keys:</p>
-   <ul>
-     <li><tt>:sample-rate</tt></li>
-     <li><tt>:channels</tt></li>
-     <li><tt>:bits-per-sample</tt></li>
-     <li><tt>:total-samples</tt></li>
-     <li><tt>:minimum-block-size</tt></li>
-     <li><tt>:maximum-block-size</tt></li>
-   </ul>
-   <p>As obvious, this plist contains some important information regarding the
-   audio in the stream, such as the number of audio channels and the sample
-   rate in Hz. The keys <tt>:minimum-block-size</tt> and
-   <tt>:maximum-block-size</tt> indicate the range of the size of a block of
-   samples that the decoder decodes in one call of <a
-   href="#flac-read">flac-read</a>.</p>
-   <p>The value for <tt>:vorbis-comment</tt> key is simply a list of
-   strings containing the comments in the metadata.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-read">Function</a>
-                       <b>flac-read</b>
- <i>handle c-buffer size</i> &rArr; <i>number-of-samples</i>
- <div class="docbody">
-   <p>Decode a block of samples from <i>handle</i> into the <i>c-buffer</i>,
-   which has the given <i>size</i>, and return the amount of samples that was
-   decoded. The <i>c-buffer</i> must be a C buffer where the element type is
-   16 bits wide, and the length of the buffer should be equal to the number of
-   channels times the maximum block size (see <a
-   href="#flac-process-metadata">flac-process-metadata</a> on how to obtain
-   this information before starting the decoding). If the current block that
-   is being decoded is larger than the provided buffer length, an error of
-   type <a href="#flac-error">flac-error</a> is signalled.</p>
-   <p><b>Note:</b> This function should allow to provide a buffer with an
-   element type that matches the bits per sample of the audio stream.
-   Currently, it simply coerces the sample into a 16-bit sample, which is
-   probably fine for most cases.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-tell">Function</a>
-                       <b>flac-tell</b> 
- <i>handle</i> &rArr; <i>sample-position</i>
- <div class="docbody">
-   <p>Returns the current sample position of <i>handle</i>.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-seek">Function</a>
-                       <b>flac-seek</b> 
- <i>handle position</i> &rArr; <i>boolean</i>
- <div class="docbody">
-   <p>Seek to the given sample <i>position</i> in <i>handle</i>, and returns
-   whether the seek succeeded.</p>
-   <p><b>Note:</b> Upon failure, no error is signalled. If the seek fails, it
-   probably means the stream is not seekable.</p>
- </div>
-</div>
-
-<div class="def"><a name="flac-eof">Function</a>
-                       <b>flac-eof</b> 
- <i>handle</i> &rArr; <i>boolean</i>
- <div class="docbody">
-   <p>Check if <i>handle</i> is at the end-of-file.</p>
- </div>
-</div>
-
-<div class="def"><a name="get-flac-tags-from-handle">Function</a>
-                       <b>get-flac-tags-from-handle</b>
- <i>handle</i> &rArr; <i>plist</i>
- <div class="docbody">
-   <p>Examines the Vorbis comments from the FLAC <i>handle</i> and returns a
+   <p>Examines the Vorbis comments from a FLAC file and returns a
    <i>plist</i> containing a subset of the following keys:</p>
      <ul>
        <li><tt>:title</tt> </li>
@@ -1424,22 +1286,17 @@ buffer, seeking and safely closing the file.</p>
        <li><tt>:genre</tt> </li>
        <li><tt>:track</tt> </li>
      </ul>
-     <p>This naturally assumes that <i>handle</i> was returned by <a
-     href="#flac-open">flac-open</a> with <tt>:vorbis-comment</tt> in the list
-     of elements of the <tt>:with-metadata</tt> keyword argument. Since this
-     function calls <a
-     href="#flac-process-metadata">flac-process-metadata</a>, the stream is
-     reset and afterwards will be at the beginning of the audio stream.</p>
      <p>For all keys except <tt>:track</tt>, the property value will
      be a string. If <tt>:track</tt> is present, it will be an
      integer.</p>
-     <p>For the key <tt>:year</tt>, the property value will in fact contain 
+     <p>For the key <tt>:year</tt>, the property value will in fact contain
      the value of the <tt>DATE</tt> field in the vorbis comments. Similarly,
      the property value for the <tt>:track</tt> key will contain the value of
-     the <tt>TRACKNUMBER</tt> field in the Vorbis comments. This maps the
-     vorbis comments well onto ID3 tags in MP3 files. Some heuristics are
+     the <tt>TRACKNUMBER</tt> field in the Vorbis comments. In this way,
+     Vorbis comments are massaged to resemble ID3 tag values as retrieved using
+     <a href="#get-tags-from-handle">get-tags-from-handle</a>. Some heuristics are
      applied to correct or reject obviously incorrect property values.
-     Specifically, track numbers of zero are removed from the
+     For instance, track numbers of zero are removed from the
      <i>plist</i>. Additionally, for Vorbis comments it is recommended to use
      multiple values of the <tt>ARTIST</tt> field if necessary. Such
      occurences are collected under one <tt>:artist</tt> key, with the values
@@ -1452,17 +1309,6 @@ buffer, seeking and safely closing the file.</p>
      <tt>DATE</tt>, the field values are copied as the property values of the
      <tt>:year</tt> key. As such, the value may contain more information
      than the key name suggests.</p>
- </div>
-</div>
-
-
-<div class="def"><a name="get-flac-tags-from-file">Function</a>
-                       <b>get-flac-tags-from-file</b> 
- <i>filename <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
- <div class="docbody">
-   <p>Open a FLAC file, examine the tags using <a
-   href="#get-flac-tags-from-handle">get-flac-tags-from-handle</a>, and return
-   the resulting <i>plist</i>.</p>
    <p>By default, the <i>filename</i> will be encoded as <tt>iso-8859-1</tt>
       <tt>(latin-1)</tt> before being passed to C; to avoid encoding
       problems on non-ASCII filenames, it is recommended you obtain the
@@ -1479,12 +1325,13 @@ buffer, seeking and safely closing the file.</p>
 <!--  ----------------------------------------------------------------- -->
 <h2><a name="mixalot-flac"></a>System: mixalot-flac</h2>
 
-<p>The <tt>mixalot-flac</tt> system builds on flac-ffi to implement a
-seekable streamer class for use with the mixer, allowing incremental decoding
-and playback of FLAC files from disk. Due to the way that mixalot works at
-this moment, only 16-bit stereo FLAC files with a sampling rate of 44.1 kHz
-can be played back. The following functions reside in the
-<tt>mixalot-flac</tt> package:</p>
+<p>The <tt>mixalot-flac</tt> system builds implements a seekable
+streamer class for use with the mixer, allowing incremental decoding
+and playback of FLAC files from disk. Presently, only 16-bit mono or
+stereo FLAC files are supported. No resampling is performed, so the
+file sampling rate must match that of the mixer for correct
+playback. The <tt>mixalot-flac</tt> package provides the
+following:</p>
 
 <div class="def"><a name="flac-streamer">Class</a>
                        <b>flac-streamer</b> 
@@ -1499,9 +1346,10 @@ can be played back. The following functions reside in the
  (class 'flac-streamer) <tt>&amp;allow-other-keys</tt></i>
  <br> &rArr; <i>flac-streamer</i>
  <div class="docbody">
-   <p>Create and return a <i>flac-streamer</i> which opens and incrementally
-   decodes from the given <i>filename</i>.  If the file cannot be opened, an
-   error of type <a href="#flac-error"><tt>flac-error</tt></a> is
+   <p>Create and return a <i>flac-streamer</i> which opens and decodes
+   audio from the given <i>filename</i>.  If the file cannot be
+   opened, an error of
+   type <a href="#flac-error"><tt>flac-error</tt></a> is
    signalled.</p>
 
    <p>The <i>class</i> argument allows specifying an alternate class
@@ -1517,20 +1365,8 @@ can be played back. The following functions reside in the
  </div>
 </div>
 
-<div class="def"><a name="flac-streamer-release-resources">Function</a>
-                       <b>flac-streamer-release-resources</b> 
- <i>flac-streamer</i>
- <div class="docbody">
-   <p>Release foreign resources held by the <i>flac-streamer</i>. In normal
-   operation, <a href="#streamer-cleanup"><tt>streamer-cleanup</tt></a> calls
-   this automatically when the streamer is removed from its mixer. It's only
-   necessary to call this yourself if the <i>flac-streamer</i> has never
-   been added to a mixer, but you want to dispose of it.</p>
- </div>
-</div>
-
 <div class="def"><a name="flac-sample-rate">Function</a>
-                       <b>flac-sample-rate</b> 
+                       <b>flac-sample-rate</b>
  <i>flac-streamer</i> &rArr; <i>rate</i>
  <div class="docbody">
    <p>Returns the native sampling <i>rate</i> of the file behind a
@@ -1541,7 +1377,7 @@ can be played back. The following functions reside in the
 
 <p>Example of creating and playing an FLAC stream:</p>
 <pre class='lisp'>
-CL-USER&gt; (mixalot:mixer-add-streamer *mixer* 
+CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
            (mixalot-flac:make-flac-streamer "/home/soemraws/test.flac"))
 #&lt;FLAC-STREAMER {1004340DB1}&gt;
 172032
