@@ -43,7 +43,8 @@
 
 ;;; Error handling
 (define-condition flac-error ()
-  ((text :initarg :text))
+  ((text :initarg :text)
+   (status :initarg :status :reader flac-error-status :initform nil))
   (:documentation "An error from the FLAC library")
   (:report
    (lambda (condition stream)
@@ -120,53 +121,61 @@
 
 ;;;; Lisp interface
 
-(defclass flac-handle ()
+(defclass flac-decoder ()
   ((decoder-handle :reader flac-decoder-handle :initarg :decoder-handle)
-   (client-data :reader flac-client-data :initarg :client-data)))
+   (deferred-condition :accessor deferred-condition :initform nil)
+   (num-channels :accessor flac-num-channels :initarg :num-channels)
+   (raw-metadata :accessor flac-raw-metadata :initform nil)
+   (metadata :accessor flac-metadata :initform nil)
+   (stream-position :reader flac-stream-position  :initform 0)
+   (buffer :accessor flac-decoder-buffer :initform nil)
+   (buffer-position :accessor flac-buffer-position :initform nil)
+   (buffer-size :accessor flac-buffer-size :initform nil)))
 
-(defcstruct flac-client-data
-  (metadata metadataptr)
-  (buffer :pointer)
-  (buffer-size flac-unsigned)
-  (block-size flac-unsigned))
-
-(defmacro flac-client-data-metadata (client-data)
-  `(foreign-slot-value ,client-data 'flac-client-data 'metadata))
-
-(defmacro flac-client-data-buffer (client-data)
-  `(foreign-slot-value ,client-data 'flac-client-data 'buffer))
-
-(defmacro flac-client-data-buffer-size (client-data)
-  `(foreign-slot-value ,client-data 'flac-client-data 'buffer-size))
-
-(defmacro flac-client-data-block-size (client-data)
-  `(foreign-slot-value ,client-data 'flac-client-data 'block-size))
-
-(defun flac-metadata-type (metadata)
-  (foreign-slot-value metadata 'flac-metadata 'type))
+(defvar *flac-decoder* nil
+  "Bound within FLAC functions to communicate lisp data to callbacks.")
 
 ;;;; Callbacks
 
+;; We can't do non-local exits from a callback, so handle errors by
+;; stashing the condition object in the decoder, and signalling it
+;; when we've returned from C.
+(defun defer-error (type &rest args)
+  (setf (deferred-condition *flac-decoder*)
+        (apply #'make-condition type args)))
+
+(defun signal-deferred (decoder)
+  (when (deferred-condition decoder)
+    (error (shiftf (deferred-condition decoder) nil))))
+
+;; A call to flac-stream-decoder-process-single pumps the decoder for
+;; a chunk of data, which is delivered via this callback:
 (defcallback write-callback
-             flac-stream-decoder-write-status
-             ((handle decoderptr)
-              (frame :pointer)
-              (decoder-buffer :pointer)
-              (client-data :pointer))
-  (declare (ignore handle))
-  (with-foreign-slots ((buffer-size buffer block-size) client-data flac-client-data)
+    flac-stream-decoder-write-status
+    ((handle decoderptr)
+     (frame :pointer)
+     (decoder-buffer :pointer)
+     (client-data :pointer))
+  (declare (ignore handle client-data))
+  (with-slots (buffer buffer-position buffer-size) *flac-decoder*
+    (assert (null buffer-position))
     (let* ((frame-header (foreign-slot-value frame 'flac-frame 'frame-header))
-           (channels (foreign-slot-value frame-header 'flac-frame-header 'channels)))
-      (setf block-size (foreign-slot-value frame-header 'flac-frame-header 'block-size))
-      (when (< buffer-size block-size)
-        (error 'flac-error
-               :text (format nil "Write callback: Buffer size ~D smaller than block size ~D"
-                             buffer-size block-size)))
-      (loop for block from 0 below block-size
-            do (loop for channel from 0 below channels
-                     do (setf (mem-aref buffer 'flac-int16 (+ (* channels block) channel))
-                              (mem-aref (mem-aref decoder-buffer :pointer channel) 'flac-int32 block))))
-      :write-continue)))
+           (num-channels (foreign-slot-value frame-header 'flac-frame-header 'channels))
+           (block-size (foreign-slot-value frame-header 'flac-frame-header 'block-size))
+           (num-samples (* num-channels block-size)))
+      ;; Ensure sufficient buffer size:
+      (when (< (length buffer) num-samples)
+        (setf buffer (make-array num-samples :element-type '(signed-byte 16) :fill-pointer nil :adjustable nil)))
+      (setf buffer-size num-samples
+            buffer-position 0)
+      ;; Copy channels to output
+     (setf (slot-value *flac-decoder* 'num-channels) num-channels) ; Hrm.
+     (dotimes (channel num-channels)
+       (loop for in-index from 0 below block-size
+             for out-index upfrom channel by num-channels
+             do (setf (aref buffer out-index)
+                      (mem-aref (mem-aref decoder-buffer :pointer channel) 'flac-int32 in-index))))
+     :write-continue)))
 
 (defcallback error-callback
              :void
@@ -175,59 +184,66 @@
               (client-data :pointer))
   (declare (ignore handle client-data))
   (unless (eql :lost-sync status)
-    (error 'flac-error
-           :text (format nil "FLAC decoder error from callback: ~A" status)))
+    (defer-error 'flac-error
+        :text (format nil "FLAC decoder error from callback: ~A" status)
+        :status status))
   nil)
 
 (defcallback metadata-callback
              :void
              ((handle decoderptr)
-              (metadata metadataptr)
+              (mptr metadataptr)
               (client-data :pointer))
-  (declare (ignore handle)
-           (optimize (speed 3)))
-  (setf (foreign-slot-value client-data 'flac-client-data 'metadata)
-        (flac-metadata-object-clone metadata)))
+  (declare (ignore handle client-data))
+  (push (flac-metadata-object-clone mptr)
+        (flac-raw-metadata *flac-decoder*)))
 
 ;;; Opening and closing a file
-(defun flac-open (filename &key (character-encoding :iso-8859-1)
-                                (with-metadata '(:stream-info :vorbis-comment)))
-  (let* ((dec-handle (flac-stream-decoder-new))
-         (data (foreign-alloc 'flac-client-data))
-         (uhandle (make-instance 'flac-handle
-                                 :decoder-handle dec-handle
-                                 :client-data data))
-         handle)
-    (unwind-protect
-      (with-foreign-slots ((metadata buffer block-size) data flac-client-data)
-        (setf metadata (null-pointer)
-              buffer (null-pointer)
-              block-size 0)
-        (flac-stream-decoder-set-md5-checking dec-handle 0)
-        (flac-stream-decoder-set-metadata-ignore-all dec-handle)
-        (map nil (lambda (x) (flac-stream-decoder-set-metadata-respond dec-handle x))
-             with-metadata)
-        (with-foreign-string (unmangled filename :encoding character-encoding)
-          (flac-stream-decoder-init-file dec-handle unmangled
-                                         (callback write-callback)
-                                         (callback metadata-callback)
-                                         (callback error-callback)
-                                         data))
-        (rotatef handle uhandle))
-      (when uhandle
-        (flac-stream-decoder-delete dec-handle)
-        (foreign-free data)))
-      handle))
 
-(defun flac-close (handle)
-  (with-slots (decoder-handle client-data buffer) handle
+(defun free-raw-metadata (decoder)
+  (with-slots (raw-metadata) decoder
+    (map nil 'flac-metadata-object-delete (flac-raw-metadata decoder))
+    (setf raw-metadata nil)))
+
+(defun flac-open (filename &key
+                  (character-encoding :iso-8859-1)
+                  (class 'flac-decoder)
+                  class-initargs)
+  (let* ((decoder-handle (flac-stream-decoder-new))
+         (*flac-decoder* (apply #'make-instance
+                                class
+                                :decoder-handle decoder-handle
+                                class-initargs))
+         initialized-decoder)
+    (unwind-protect
+         (progn
+           (flac-stream-decoder-set-md5-checking decoder-handle 0)
+           (flac-stream-decoder-set-metadata-ignore-all decoder-handle)
+           (flac-stream-decoder-set-metadata-respond decoder-handle :stream-info)
+           (flac-stream-decoder-set-metadata-respond decoder-handle :vorbis-comment)
+           (with-foreign-string (unmangled filename :encoding character-encoding)
+             (flac-stream-decoder-init-file decoder-handle unmangled
+                                            (callback write-callback)
+                                            (callback metadata-callback)
+                                            (callback error-callback)
+                                            (null-pointer)))
+           (setf (flac-metadata *flac-decoder*) (flac-process-metadata *flac-decoder*))
+           (setf initialized-decoder *flac-decoder*))
+
+      (unless initialized-decoder
+        (flac-stream-decoder-delete decoder-handle)
+        (free-raw-metadata *flac-decoder*)))
+
+    initialized-decoder))
+
+(defun flac-close (decoder)
+  (with-slots (decoder-handle buffer metadata) decoder
+    (setf buffer nil)
+    (free-raw-metadata decoder)
     (when decoder-handle
       (flac-stream-decoder-finish decoder-handle)
       (flac-stream-decoder-delete decoder-handle)
-      (foreign-free client-data)
-      (setf decoder-handle nil
-            client-data nil))))
-
+      (setf decoder-handle nil))))
 
 ;;; Processing metadata
 (defun flac-process-stream-info (metadata)
@@ -255,87 +271,68 @@
                       (foreign-slot-value comment-entry
                                           'flac-metadata-vorbis-comment-entry 'entry))))))
 
-(defun flac-process-stream-info-by-type (metadata)
+(defun flac-metadata-type (metadata)
+  (foreign-slot-value metadata 'flac-metadata 'type))
+
+(defun flac-process-metadata-block (metadata)
   (let ((type (flac-metadata-type metadata)))
-    (values
+    (list
+      type
       (case type
         (:stream-info (flac-process-stream-info metadata))
-        (:vorbis-comment (flac-process-vorbis-comment metadata)))
-      type)))
+        (:vorbis-comment (flac-process-vorbis-comment metadata))))))
 
-(defun flac-process-metadata (handle)
-  (with-slots (decoder-handle client-data) handle
-    (unless (eql (flac-stream-decoder-get-state decoder-handle) :search-for-metadata)
-      (flac-stream-decoder-reset decoder-handle))
-    (flac-stream-decoder-set-md5-checking decoder-handle 0)
-    (loop with metadata
-          with plist
+(defun flac-process-metadata (decoder)
+  (let ((*flac-decoder* decoder))
+   (with-slots (decoder-handle) decoder
+     ;; Reset stream. Dubious. Discuss.
+     (unless (eql (flac-stream-decoder-get-state decoder-handle) :search-for-metadata)
+       (flac-stream-decoder-reset decoder-handle))
+     (flac-stream-decoder-set-md5-checking decoder-handle 0)
+     ;; Scan through metadata blocks.
+     (flac-stream-decoder-process-until-end-of-metadata decoder-handle)
+     (signal-deferred decoder)
+     ;; Interpret metadata blocks.
+     (mapcan #'flac-process-metadata-block (flac-raw-metadata decoder)))))
 
-          do (progn
-               (flac-stream-decoder-process-single decoder-handle)
-               (setf metadata (flac-client-data-metadata client-data)))
+(defun flac-refill-buffer (decoder)
+  (let ((*flac-decoder* decoder))
+    (flac-stream-decoder-process-single (flac-decoder-handle decoder))
+    (flac-buffer-size decoder)
+    (signal-deferred decoder)))
 
-          if (null-pointer-p metadata)
-          do (setf plist nil)
-          else
-          do (progn
-               (multiple-value-bind (content type)
-                 (flac-process-stream-info-by-type metadata)
-                 (setf plist (list type content)))
-               (flac-metadata-object-delete metadata)
-               (setf (flac-client-data-metadata client-data) (null-pointer)))
+(defun flac-seek (decoder sample)
+  (let ((*flac-decoder* decoder))
+   (with-slots (decoder-handle buffer-size buffer-position stream-position) decoder
+     (setf buffer-size nil
+           buffer-position nil)
+     ;; WTF. The return values here don't seem to correlate with
+     ;; whether the seek succeeded or not. I don't like doing this,
+     ;; but I'm just going to set the stream position as though it
+     ;; always succeeds:
+     (setf stream-position sample)
+     (cond
+       ;; Seek failed:
+       ((zerop (flac-stream-decoder-seek-absolute decoder-handle sample))
+        (signal-deferred decoder)
+        (when (eql (flac-stream-decoder-get-state decoder-handle) :seek-error)
+          (flac-stream-decoder-flush decoder-handle)))
+       ;; Success?
+       (t #+NIL (setf stream-position sample)))))
+  (signal-deferred decoder))
 
-          when plist
-          nconcing plist
-
-          until (eql (flac-stream-decoder-get-state decoder-handle) :search-for-frame-sync))))
-
-(defun flac-read (handle buffer buffer-size)
-  "Read number of samples from the handle and store them in the C buffer of size buffer-size.
-  The number of samples that are read is returned."
-  (declare (optimize (speed 3)))
-  (with-slots (decoder-handle client-data) handle
-    (let ((state (flac-stream-decoder-get-state decoder-handle)))
-      (when (or (eql state :search-for-metadata)
-                (eql state :read-metadata))
-        (flac-process-metadata handle)
-        (setf state (flac-stream-decoder-get-state decoder-handle)))
-      (if (or (eql state :read-frame)
-              (eql state :search-for-frame-sync))
-        (progn
-          (setf (flac-client-data-buffer client-data) buffer
-                (flac-client-data-buffer-size client-data) buffer-size)
-          (flac-stream-decoder-process-single decoder-handle)
-          (flac-client-data-block-size client-data))
-        0))))
-
-(defun flac-seek (handle sample)
-  (let ((decoder-handle (flac-decoder-handle handle)))
-    (if (zerop (flac-stream-decoder-seek-absolute decoder-handle sample))
-      (when (eql (flac-stream-decoder-get-state decoder-handle) :seek-error)
-        (flac-stream-decoder-flush decoder-handle)
-        nil)
-      t)))
-
-(defun flac-tell (handle)
-  (with-foreign-object (pos 'flac-uint64)
-    (flac-stream-decoder-get-decode-position (flac-decoder-handle handle) pos)
-    (mem-ref pos 'flac-uint64)))
-
-(defun flac-eof (handle)
-  (eql (flac-stream-decoder-get-state (flac-decoder-handle handle)) :end-of-stream))
-
-(defun get-flac-tags-from-handle (handle)
-  "Returns a plist of tags with keys that are somewhat compatible with the MP3 ID3 tags."
-  (let* ((plist (flac-process-metadata handle))
-         (comments (getf plist :vorbis-comment)))
-    (vorbis-comments-to-tags comments)))
+(defun flac-eof (decoder)
+  (with-slots (buffer-size buffer-position) decoder
+    (and (eql buffer-size buffer-position)
+         (case (flac-stream-decoder-get-state (flac-decoder-handle decoder))
+             ((:end-of-stream :ogg-error) t) ; Not sure about errors.
+             (otherwise nil)))))
 
 (defun get-flac-tags-from-file (filename &key (character-encoding :iso-8859-1))
   "Open a FLAC file, retrieve the tags, and close it."
-  (let* ((handle (flac-open filename
-                            :character-encoding character-encoding
-                            :with-metadata '(:vorbis-comment)))
-         (tags (get-flac-tags-from-handle handle)))
-    (flac-close handle)
-    tags))
+  (let ((decoder (flac-open filename
+                            :character-encoding character-encoding)))
+    (unwind-protect
+         (vorbis-comments-to-tags
+          (getf (flac-metadata decoder) :vorbis-comment))
+      (flac-close decoder))))

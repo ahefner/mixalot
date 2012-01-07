@@ -7,6 +7,7 @@
 
            #:flac-strerror
            #:flac-error
+           #:flac-error-status
 
            #:flac-open
            #:flac-close
@@ -16,13 +17,12 @@
            #:flac-tell
            #:flac-process-metadata
 
+           #:flac-decoder
            #:flac-decoder-handle
-           #:flac-client-data
+           #:flac-num-channels
+           #:flac-metadata
+           #:flac-raw-metadata
+           #:flac-stream-position
 
-           #:flac-client-data-metadata
-           #:flac-client-data-buffer
-           #:flac-client-data-buffer-size
-           #:flac-client-data-block-size
-           
            #:get-flac-tags-from-file
            #:get-flac-tags-from-handle))
