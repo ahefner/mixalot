@@ -76,7 +76,12 @@
            #:fast-vector-streamer-interleaved-stereo
            #:make-fast-vector-streamer-interleaved-stereo
            #:fast-vector-streamer-joint-stereo
-           #:make-fast-vector-streamer-joint-stereo))
+           #:make-fast-vector-streamer-joint-stereo
+
+           #:vector-streamer-mono-single-float
+           #:make-vector-streamer-mono-single-float
+           #:vector-streamer-mono-double-float
+           #:make-vector-streamer-mono-double-float))
 
 (in-package :mixalot)
 
@@ -728,7 +733,7 @@
     (setf (slot-value stream 'position) (seek-to stream)
           (seek-to stream) nil)))
 
-(defmacro define-vector-streamer (name type step sample-expr)
+(defmacro define-vector-streamer (name &key type step sample-expr optimize)
   `(progn
      (defclass ,name (vector-streamer) ())
      (defun ,(intern (format nil "MAKE-~A" (symbol-name name)))
@@ -740,39 +745,61 @@
      (defmethod streamer-mix-into ((stream ,name) mixer buffer offset length time)
        (declare (type array-index offset length)
                 (type sample-vector buffer)
-                (optimize (speed 3))
+                ,@(and optimize '((optimize (speed 3))))
                 (ignore time))
        (vector-stream-do-seek stream)
        (meta-vector-streamer stream stereo-mixf ,type ,step ,sample-expr))
      (defmethod streamer-write-into ((stream ,name) mixer buffer offset length time)
        (declare (type array-index offset length)
                 (type sample-vector buffer)
-                (optimize (speed 3))
+                ,@(and optimize '((optimize (speed 3))))
                 (ignore time))
        (vector-stream-do-seek stream)
        (meta-vector-streamer stream setf ,type ,step ,sample-expr))))
 
-(define-vector-streamer  vector-streamer-mono
-    vector 1 (mono->stereo (aref vector vector-index)))
+(define-vector-streamer vector-streamer-mono
+    :type vector
+    :step 1
+    :sample-expr (mono->stereo (aref vector vector-index)))
 
-(define-vector-streamer  vector-streamer-interleaved-stereo
-    vector 2 (stereo-sample (aref vector vector-index)
-                            (aref vector (1+ vector-index))))
+(define-vector-streamer vector-streamer-interleaved-stereo
+    :type vector
+    :step 2
+    :sample-expr (stereo-sample (aref vector vector-index)
+                                (aref vector (1+ vector-index))))
 
-(define-vector-streamer  vector-streamer-joint-stereo
-    vector 1 (aref vector vector-index))
+(define-vector-streamer vector-streamer-joint-stereo
+    :type vector
+    :step 1
+    :sample-expr (aref vector vector-index))
 
-(define-vector-streamer  fast-vector-streamer-mono
-    (simple-array (signed-byte 16) 1) 1
-    (mono->stereo (aref vector vector-index)))
+(define-vector-streamer fast-vector-streamer-mono
+    :type (simple-array (signed-byte 16) 1)
+    :step 1
+    :sample-expr (mono->stereo (aref vector vector-index)))
 
-(define-vector-streamer  fast-vector-streamer-interleaved-stereo
-    (simple-array (signed-byte 16) 1) 2
-    (stereo-sample (aref vector vector-index)
-                   (aref vector (1+ vector-index))))
+(define-vector-streamer fast-vector-streamer-interleaved-stereo
+    :type (simple-array (signed-byte 16) 1)
+    :optimize t
+    :step 2
+    :sample-expr (stereo-sample (aref vector vector-index)
+                                (aref vector (1+ vector-index))))
 
-(define-vector-streamer  fast-vector-streamer-joint-stereo
-    sample-vector 1 (aref vector vector-index))
+(define-vector-streamer fast-vector-streamer-joint-stereo
+    :type sample-vector
+    :optimize t
+    :step 1
+    :sample-expr (aref vector vector-index))
+
+(define-vector-streamer vector-streamer-mono-single-float
+    :type (vector single-float)
+    :step 1
+    :sample-expr (mono->stereo (clamp-sample (round (* 32767.0f0 (aref vector vector-index))))))
+
+(define-vector-streamer vector-streamer-mono-double-float
+    :type (vector double-float)
+    :step 1
+    :sample-expr (mono->stereo (clamp-sample (round (* 32767.0d0 (aref vector vector-index))))))
 
 (defmethod streamer-seekable-p ((stream vector-streamer) mixer)
   (declare (ignore mixer))

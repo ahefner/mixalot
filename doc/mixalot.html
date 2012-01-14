@@ -536,6 +536,36 @@ functions construct these streamers:
  </div>
 </div>
 
+<div class="def"><a name="make-vector-streamer-mono-single-float">Function</a>
+                       <b>make-vector-streamer-mono-single-float</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming a single channel of
+  audio in floating-point format from a range of <i>vector</i> defined
+  by <i>start</i> and <i>end</i>. Samples must be
+  in <tt>single-float</tt> format, and should be scaled to fit within
+  the range -1.0 to 1.0. Values outside this range will be clamped.
+  <i>Vector</i> is assumed to be of type <tt>(vector single-float)</tt>.
+  </p>
+ </div>
+</div>
+
+<div class="def"><a name="make-vector-streamer-mono-double-float">Function</a>
+                       <b>make-vector-streamer-mono-double</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
+ <i>vector-streamer</i>
+ <div class="docbody">
+  <p>Creates a <i>vector-streamer</i> streaming a single channel of
+  audio in floating-point format from a range of <i>vector</i> defined
+  by <i>start</i> and <i>end</i>. Samples must be
+  in <tt>double-float</tt> format, and should be scaled to fit within
+  the range -1.0 to 1.0. Values outside this range will be clamped.
+  <i>Vector</i> is assumed to be of type <tt>(vector double-float)</tt>.
+  </p>
+ </div>
+</div>
+
 
 
 <h3><a name="mix_SampleManipulation"></a>Sample Manipulation</h3>
