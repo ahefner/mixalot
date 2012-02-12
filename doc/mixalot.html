@@ -11,7 +11,7 @@
 <body>
 
 <h1>Mixalot User Manual</h1>
-<p>Version 0.0.4</p>
+<p>Version 0.0.5</p>
 
 <!-- Contents -->
 
@@ -50,7 +50,7 @@
   <li><a href="#mixalot-vorbis">System: mixalot-vorbis</a></li>
   <li><a href="#flac-ffi">System: flac-ffi</a></li>
   <li><a href="#mixalot-flac">System: mixalot-flac</a></li>
-  <li><a href="#future-work">Future Work</a></li>
+  <li><a href="#Future-Work">Future Work</a></li>
   <li><a href="#License">License</a></li>
 </ol>
 
@@ -113,11 +113,6 @@ in the following configurations:</p>
   <li>SBCL (w/sb-thread enabled) on FreeBSD 8.2 (amd64)</li>
   <li>Clozure CL on Linux/x86_64</li>
 </ul>
-It has been tested on the following platforms and found not to work:
-<ul>
-  <li>ECL on Linux x86_64 (stuttering audio - performance issue?)</li>
-</ul>
-
 <p>The <tt>mpg123-ffi</tt> system is independent and should be usable on any CL supported by CFFI.</p>
 
 <!--  ----------------------------------------------------------------- -->
@@ -826,9 +821,33 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 
 <h3>Helpers</h3>
 
+<div class="def"><a name="get-bitstream-properties">Function</a>
+                       <b>get-bitstream-properties</b>
+ <i>handle</i> &rArr; <i>plist</i>
+ <div class="docbody">
+   <p>Retrieves information about an MPEG bitstream (version, mode,
+     bitrate, etc.) from an mpg123 <i>handle</i>. Decodes the contents
+     of the <tt>mpg123_frameinfo</tt> structure (as retrieved
+     by <tt>mpg123_info</tt>) as a property list containing the
+     following keys:</p>
+  <ul>
+    <li><tt>:mpeg-version</tt></li>
+    <li><tt>:layer</tt></li>
+    <li><tt>:rate-hz</tt></li>
+    <li><tt>:mode</tt></li>
+    <li><tt>:mode-ext</tt></li>
+    <li><tt>:flags</tt></li>
+    <li><tt>:emphasis</tt></li>
+    <li><tt>:bitrate</tt></li>
+    <li><tt>:abr-rate</tt></li>
+    <li><tt>:vbr</tt></li>
+  </ul>
+ </div>
+</div>
+
 <div class="def"><a name="get-tags-from-handle">Function</a>
                        <b>get-tags-from-handle</b>
- <i>handle</i> &rArr; <i>plist</i>
+ <i>handle</i> &rArr; <i>plist bitstream-properties</i>
  <div class="docbody">
    <p>Examines ID3v1 and ID3v2 tags from an mpg123 <i>handle</i>,
    returning a <i>plist</i> containing a subset of the following keys:</p>
@@ -844,12 +863,15 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
      <p>For all keys except <tt>:track</tt>, the property value will
      be a string. If <tt>:track</tt> is present, it will be an
      integer.</p>
-     <p>Prefers taking values from ID3v2 tags, but falls back to the
-     ID3v1 tag when necessary.  Some heuristics are applied to correct
-     or reject obviously incorrect property values. Specifically,
-     various forms of year are canonicalized to a four-digit form if a
-     reasonable guess can be made, and track numbers of zero are
-     removed from the <i>plist</i>.</p>
+     <p>When present, ID3v2 tags override data from ID3v1 tags.  Some
+     heuristics are applied to correct or reject obviously incorrect
+     property values. For instance, various forms of year are
+     canonicalized to a four-digit form if a reasonable guess can be
+     made, and track numbers of zero are removed from
+     the <i>plist</i>.</p>
+     <p>The bitstream properties, obtained
+     from <a href="#get-bitstream-properties">get-bitstream-properties</a>,
+     are returned as a second value.</p>
      <p><b>Issue:</b> Currently only extracts track numbers from the
      ID3v2 <tt>TRCK</tt> field, but should definitely fall back to the
      ID3v1.1 track number field if this is not present.</p>
@@ -859,7 +881,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 
 <div class="def"><a name="get-tags-from-file">Function</a>
                        <b>get-tags-from-file</b>
- <i>filename <tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
+ <i>filename <tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> &rArr; <i>plist bitstream-properties</i>
  <div class="docbody">
    <p>Open an MP3 file, examine its tags
       using <a href="#get-tags-from-handle">get-tags-from-handle</a>,
@@ -874,6 +896,9 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
       (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice
       should be congruent with how the string was obtained from the filesystem).
    </p>
+     <p>The bitstream properties, obtained
+     from <a href="#get-bitstream-properties">get-bitstream-properties</a>,
+     are returned as a second value.</p>
  </div>
 </div>
 
@@ -1053,7 +1078,7 @@ while immediately doing some error checking. For all other functions, see
 
 <div class="def"><a name="vorbis-open">Function</a>
                        <b>vorbis-open</b>
- <i>filename handle <tt>&key</tt> (character-encoding :iso-8859-1)</i>
+ <i>filename handle <tt>&amp;key</tt> (character-encoding :iso-8859-1)</i>
  <div class="docbody">
    <p>Open the file with the given <i>filename</i> and attach it to the given
    <i>handle</i>, which must have already been created using <a
@@ -1415,7 +1440,7 @@ CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
 
 <!--  ----------------------------------------------------------------- -->
 
-<a name='future-work'></a><h2>Future Work</h2>
+<h2><a name='Future-Work'></a>Future Work</h2>
 
 <p>Various ideas for improvement, which might appear on an as-needed basis:</p>
 <ul>
@@ -1427,7 +1452,7 @@ CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
 
 <!--  ----------------------------------------------------------------- -->
 
-<a name="License"></a><h2>License</h2>
+<h2><a name="License"></a>License</h2>
 <p>Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
  "Software"), to deal in the Software without restriction, including

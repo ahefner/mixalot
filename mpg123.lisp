@@ -167,6 +167,7 @@
 
            #:ensure-libmpg123-initialized
 
+           #:get-bitstream-properties
            #:get-tags-from-handle
            #:get-tags-from-file
            #:decode-mp3-file))
@@ -493,6 +494,13 @@
   (vbr       mpg123-vbr))
 
 ;;; Store information about MPEG audio bitstream into frameinfo structure.
+
+;;; * Note that this expects the decoder is already initialized, by
+;;; e.g. decoding some audio, or calling mpg123_getformat. Unlike many
+;;; libmpg123 functions, it won't take care of this itself. Instead,
+;;; it tries to decode uninitialized data in the handle structure and
+;;; will likely segfault.
+
 (defcfun mpg123-info :int
   (mh handleptr)
   (mi (:pointer frameinfo)))
@@ -732,7 +740,6 @@ encoding."
     ;; Return genre, preferring the version 2 string.
     (or v2-genre (and v1-genre (translate-id3v1-genre v1-genre)))))
 
-
 (defun convert-mpg123-string (str)
   (let ((ptr (mpg123-string-data str)))
     (and (not (null-pointer-p ptr))
@@ -790,6 +797,33 @@ encoding."
                       (char= (aref year 1) #\0)))
          year))))
 
+(defun get-bitstream-properties (handle)
+  (with-foreign-object (frameinfo 'frameinfo)
+    (check-mpg123-plain-error
+     "Get frameinfo"
+     (mpg123-info handle frameinfo))
+    (list
+     :mpeg-version
+     (frameinfo-mpeg-version frameinfo)
+     :layer
+     (frameinfo-layer frameinfo)
+     :rate-hz
+     (frameinfo-rate-hz frameinfo)
+     :mode
+     (frameinfo-mode frameinfo)
+     :mode-ext
+     (frameinfo-mode-ext frameinfo)
+     :flags
+     (frameinfo-flags frameinfo)
+     :emphasis
+     (frameinfo-emphasis frameinfo)
+     :bitrate
+     (frameinfo-bitrate frameinfo)
+     :abr-rate
+     (frameinfo-abr-rate frameinfo)
+     :vbr
+     (frameinfo-vbr frameinfo))))
+
 (defun get-tags-from-handle (handle &key print-misc-tags (no-utf8 nil))
 "Parse ID3 from the given mpg123 handle and return some subset of
 title, artist, album, year, comment, tack, and genre as a property
@@ -830,7 +864,10 @@ list."
               (dump-mpg123-texts "Comment" (id3v2-comment-list v2) (id3v2-comments v2))
               (dump-mpg123-texts "Text"    (id3v2-text v2)         (id3v2-texts v2))
               (dump-mpg123-texts "Extra"   (id3v2-extra v2)        (id3v2-extras v2)))
-            (return (clean-tags properties))))))
+            (return
+              (values
+               (clean-tags properties)
+               (get-bitstream-properties handle)))))))
 
 (defun get-tags-from-file (filename &key
                            verbose
@@ -848,8 +885,11 @@ artist, album, year, comment, tack, and genre as a property list."
         (check-mh-error "mpg123 open file" handle (mpg123-open handle unmangled)))
       (unwind-protect
            (progn
+             ;; This is necessary to initialize the decoder:
              (mpg123-getformat handle)
+             ;; Now we can get the tags:
              (get-tags-from-handle handle :no-utf8 no-utf8))
+        ;; Unwind cleanups:
         (mpg123-close handle)
         (mpg123-delete handle)))))
 
