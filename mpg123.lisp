@@ -495,7 +495,7 @@
 ;;; Store information about MPEG audio bitstream into frameinfo structure.
 (defcfun mpg123-info :int
   (mh handleptr)
-  (mi (:pointer mpg123-version)))
+  (mi (:pointer frameinfo)))
 
 ;;; Scan each frame in the file, locating ID3 tags and computing an
 ;;; accurate length.
