@@ -479,7 +479,7 @@
 (defconstant MPG123_PRIVATE   #x4)
 (defconstant MPG123_ORIGINAL  #x8)
 
-(defcstruct (frameinfo :conc-name frame-info-)
+(defcstruct (frameinfo :conc-name frameinfo-)
   (mpeg-version mpg123-version)
   (layer     :int)
   (rate-hz   :long)
