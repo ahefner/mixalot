@@ -6,7 +6,7 @@
 ;;;; a copy of this software and associated documentation files (the
 ;;;; "Software"), to deal in the Software without restriction, including
 ;;;; without limitation the rights to use, copy, modify, merge, publish,
-;;;; distribute, sublicense, and/or sellcopies of the Software, and to 
+;;;; distribute, sublicense, and/or sellcopies of the Software, and to
 ;;;; permit persons to whom the Software is furnished to do so, subject
 ;;;;  to the following conditions:
 
@@ -22,7 +22,7 @@
 ;;;; FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 ;;;; OTHER DEALINGS IN THE SOFTWARE.
 
-(defpackage :mpg123 
+(defpackage :mpg123
   (:use :common-lisp :cffi :mixalot-ffi-common :mixalot-strings-common)
   (:export
            #:mpg123-error
@@ -168,14 +168,14 @@
            #:ensure-libmpg123-initialized
 
            #:get-tags-from-handle
-           #:get-tags-from-file           
+           #:get-tags-from-file
            #:decode-mp3-file))
 
 (in-package :mpg123)
 
 
 (define-foreign-library libmpg123
-  (:darwin (:or "libmpg123.dylib" "libmpg123.0.dylib" 
+  (:darwin (:or "libmpg123.dylib" "libmpg123.0.dylib"
                 "/opt/local/lib/libmpg123.0.dylib"))
   (:unix (:or "libmixalot-mpg123.so.0"
               "libmpg123.so.0"
@@ -216,7 +216,7 @@
    (lambda (condition stream)
      (write-string (slot-value condition 'text) stream))))
 
-(defcfun mpg123-strerror :string 
+(defcfun mpg123-strerror :string
   (mh handleptr))
 
 (defun check-mh-error (circumstance handle return-value)
@@ -229,39 +229,39 @@
 
 ;;;; Error codes
 
-(defconstant MPG123_DONE -12)           ; Message: Track ended. 
-(defconstant MPG123_NEW_FORMAT -11)     ; Message: Output format will be different on next call. 
-(defconstant MPG123_NEED_MORE -10)      ; Message: For feed reader: "Feed me more!" 
-(defconstant MPG123_ERR -1)             ; Generic Error 
-(defconstant MPG123_OK 0)               ; Success 
-(defconstant MPG123_BAD_OUTFORMAT 1)    ; Unable to set up output format! 
-(defconstant MPG123_BAD_CHANNEL 2)      ; Invalid channel number specified. 
-(defconstant MPG123_BAD_RATE 3)         ; Invalid sample rate specified.  
-(defconstant MPG123_ERR_16TO8TABLE 4)   ; Unable to allocate memory for 16 to 8 converter table! 
-(defconstant MPG123_BAD_PARAM 5)        ; Bad parameter id! 
-(defconstant MPG123_BAD_BUFFER 6)       ; Bad buffer given -- invalid pointer or too small size. 
-(defconstant MPG123_OUT_OF_MEM 7)       ; Out of memory -- some malloc() failed. 
-(defconstant MPG123_NOT_INITIALIZED 8)  ; You didn't initialize the library! 
-(defconstant MPG123_BAD_DECODER 9)      ; Invalid decoder choice. 
-(defconstant MPG123_BAD_HANDLE 10)      ; Invalid mpg123 handle. 
-(defconstant MPG123_NO_BUFFERS 11)      ; Unable to initialize frame buffers (out of memory?). 
-(defconstant MPG123_BAD_RVA 12)         ; Invalid RVA mode. 
-(defconstant MPG123_NO_GAPLESS 13)      ; This build doesn't support gapless decoding. 
-(defconstant MPG123_NO_SPACE 14)        ; Not enough buffer space. 
-(defconstant MPG123_BAD_TYPES 15)       ; Incompatible numeric data types. 
-(defconstant MPG123_BAD_BAND 16)        ; Bad equalizer band. 
-(defconstant MPG123_ERR_NULL 17)        ; Null pointer given where valid storage address needed. 
-(defconstant MPG123_ERR_READER 18)      ; Error reading the stream. 
-(defconstant MPG123_NO_SEEK_FROM_END 19) ; Cannot seek from end (end is not known). 
+(defconstant MPG123_DONE -12)           ; Message: Track ended.
+(defconstant MPG123_NEW_FORMAT -11)     ; Message: Output format will be different on next call.
+(defconstant MPG123_NEED_MORE -10)      ; Message: For feed reader: "Feed me more!"
+(defconstant MPG123_ERR -1)             ; Generic Error
+(defconstant MPG123_OK 0)               ; Success
+(defconstant MPG123_BAD_OUTFORMAT 1)    ; Unable to set up output format!
+(defconstant MPG123_BAD_CHANNEL 2)      ; Invalid channel number specified.
+(defconstant MPG123_BAD_RATE 3)         ; Invalid sample rate specified.
+(defconstant MPG123_ERR_16TO8TABLE 4)   ; Unable to allocate memory for 16 to 8 converter table!
+(defconstant MPG123_BAD_PARAM 5)        ; Bad parameter id!
+(defconstant MPG123_BAD_BUFFER 6)       ; Bad buffer given -- invalid pointer or too small size.
+(defconstant MPG123_OUT_OF_MEM 7)       ; Out of memory -- some malloc() failed.
+(defconstant MPG123_NOT_INITIALIZED 8)  ; You didn't initialize the library!
+(defconstant MPG123_BAD_DECODER 9)      ; Invalid decoder choice.
+(defconstant MPG123_BAD_HANDLE 10)      ; Invalid mpg123 handle.
+(defconstant MPG123_NO_BUFFERS 11)      ; Unable to initialize frame buffers (out of memory?).
+(defconstant MPG123_BAD_RVA 12)         ; Invalid RVA mode.
+(defconstant MPG123_NO_GAPLESS 13)      ; This build doesn't support gapless decoding.
+(defconstant MPG123_NO_SPACE 14)        ; Not enough buffer space.
+(defconstant MPG123_BAD_TYPES 15)       ; Incompatible numeric data types.
+(defconstant MPG123_BAD_BAND 16)        ; Bad equalizer band.
+(defconstant MPG123_ERR_NULL 17)        ; Null pointer given where valid storage address needed.
+(defconstant MPG123_ERR_READER 18)      ; Error reading the stream.
+(defconstant MPG123_NO_SEEK_FROM_END 19) ; Cannot seek from end (end is not known).
 (defconstant MPG123_BAD_WHENCE 20)      ; Invalid 'whence' for seek function.
-(defconstant MPG123_NO_TIMEOUT 21)      ; Build does not support stream timeouts. 
-(defconstant MPG123_BAD_FILE 22)        ; File access error. 
-(defconstant MPG123_NO_SEEK 23)         ; Seek not supported by stream. 
-(defconstant MPG123_NO_READER 24)       ; No stream opened. 
-(defconstant MPG123_BAD_PARS 25)        ; Bad parameter handle. 
-(defconstant MPG123_BAD_INDEX_PAR 26)   ; Bad parameters to mpg123_index() 
-(defconstant MPG123_OUT_OF_SYNC 27)     ; Lost track in bytestream and did not try to resync. 
-(defconstant MPG123_RESYNC_FAIL 28)     ; Resync failed to find valid MPEG data. 
+(defconstant MPG123_NO_TIMEOUT 21)      ; Build does not support stream timeouts.
+(defconstant MPG123_BAD_FILE 22)        ; File access error.
+(defconstant MPG123_NO_SEEK 23)         ; Seek not supported by stream.
+(defconstant MPG123_NO_READER 24)       ; No stream opened.
+(defconstant MPG123_BAD_PARS 25)        ; Bad parameter handle.
+(defconstant MPG123_BAD_INDEX_PAR 26)   ; Bad parameters to mpg123_index()
+(defconstant MPG123_OUT_OF_SYNC 27)     ; Lost track in bytestream and did not try to resync.
+(defconstant MPG123_RESYNC_FAIL 28)     ; Resync failed to find valid MPEG data.
 
 
 ;;;; Interface to interesting bits of mpg123 library.
@@ -286,32 +286,32 @@
   (mh handleptr))
 
 (defcenum mpg123-parms
-  :VERBOSE         ; set verbosity value for enabling messages to stderr, >= 0 makes sense 
-  :FLAGS           ; set all flags, p.ex val = MPG123_GAPLESS|MPG123_MONO_MIX 
-  :ADD-FLAGS       ; add some flags 
-  :FORCE-RATE      ; when value > 0, force output rate to that value 
-  :DOWN-SAMPLE     ; 0=native rate, 1=half rate, 2=quarter rate 
-  :RVA             ; one of the RVA choices above 
-  :DOWNSPEED       ; play a frame N times 
-  :UPSPEED         ; play every Nth frame 
-  :START-FRAME     ; start with this frame (skip frames before that)  
-  :DECODE-FRAMES   ; decode only this number of frames 
-  :ICY-INTERVAL    ; stream contains ICY metadata with this interval 
-  :OUTSCALE        ; the scale for output samples (amplitude) 
-  :TIMEOUT         ; timeout for reading from a stream (not supported on win32) 
-  :REMOVE-FLAGS    ; remove some flags (inverse of MPG123_ADD_FLAGS) 
+  :VERBOSE         ; set verbosity value for enabling messages to stderr, >= 0 makes sense
+  :FLAGS           ; set all flags, p.ex val = MPG123_GAPLESS|MPG123_MONO_MIX
+  :ADD-FLAGS       ; add some flags
+  :FORCE-RATE      ; when value > 0, force output rate to that value
+  :DOWN-SAMPLE     ; 0=native rate, 1=half rate, 2=quarter rate
+  :RVA             ; one of the RVA choices above
+  :DOWNSPEED       ; play a frame N times
+  :UPSPEED         ; play every Nth frame
+  :START-FRAME     ; start with this frame (skip frames before that)
+  :DECODE-FRAMES   ; decode only this number of frames
+  :ICY-INTERVAL    ; stream contains ICY metadata with this interval
+  :OUTSCALE        ; the scale for output samples (amplitude)
+  :TIMEOUT         ; timeout for reading from a stream (not supported on win32)
+  :REMOVE-FLAGS    ; remove some flags (inverse of MPG123_ADD_FLAGS)
   :RESYNC-LIMIT)   ; Try resync on frame parsing for that many bytes or until end of stream (<0).
 
-(defconstant MPG123_FORCE_MONO     #x7)    ;     0111 Force some mono mode: This is a test bitmask for seeing if any mono forcing is active. 
-(defconstant MPG123_MONO_LEFT      #x1)    ;     0001 Force playback of left channel only.  
-(defconstant MPG123_MONO_RIGHT     #x2)    ;     0010 Force playback of right channel only. 
-(defconstant MPG123_MONO_MIX       #x4)    ;     0100 Force playback of mixed mono.         
-(defconstant MPG123_FORCE_STEREO   #x8)    ;     1000 Force stereo output.                  
-(defconstant MPG123_FORCE_8BIT     #x10)   ; 00010000 Force 8bit formats.                   
-(defconstant MPG123_QUIET          #x20)   ; 00100000 Suppress any printouts (overrules verbose).                    
-(defconstant MPG123_GAPLESS        #x40)   ; 01000000 Enable gapless decoding (default on if libmpg123 has support). 
-(defconstant MPG123_NO_RESYNC      #x80)   ; 10000000 Disable resync stream after error.                             
-(defconstant MPG123_SEEKBUFFER     #x100)  ; 000100000000 Enable small buffer on non-seekable streams to allow some peek-ahead (for better MPEG sync). 
+(defconstant MPG123_FORCE_MONO     #x7)    ;     0111 Force some mono mode: This is a test bitmask for seeing if any mono forcing is active.
+(defconstant MPG123_MONO_LEFT      #x1)    ;     0001 Force playback of left channel only.
+(defconstant MPG123_MONO_RIGHT     #x2)    ;     0010 Force playback of right channel only.
+(defconstant MPG123_MONO_MIX       #x4)    ;     0100 Force playback of mixed mono.
+(defconstant MPG123_FORCE_STEREO   #x8)    ;     1000 Force stereo output.
+(defconstant MPG123_FORCE_8BIT     #x10)   ; 00010000 Force 8bit formats.
+(defconstant MPG123_QUIET          #x20)   ; 00100000 Suppress any printouts (overrules verbose).
+(defconstant MPG123_GAPLESS        #x40)   ; 01000000 Enable gapless decoding (default on if libmpg123 has support).
+(defconstant MPG123_NO_RESYNC      #x80)   ; 10000000 Disable resync stream after error.
+(defconstant MPG123_SEEKBUFFER     #x100)  ; 000100000000 Enable small buffer on non-seekable streams to allow some peek-ahead (for better MPEG sync).
 
 (defcfun mpg123-param :int
   (mh      handleptr)
@@ -347,16 +347,16 @@
   (decoder-name :string))
 
 ;;; Output encodings
-(defconstant MPG123_ENC_16      #x40)                                                 ; 0100 0000 Some 16 bit encoding... 
-(defconstant MPG123_ENC_SIGNED  #x80)                                                 ; 1000 0000 Some signed encoding... 
-(defconstant MPG123_ENC_8       #x0f)                                                 ; 0000 1111 Some 8 bit encoding...   
-(defconstant MPG123_ENC_SIGNED_16    (logior MPG123_ENC_16 MPG123_ENC_SIGNED #x10))   ; 1101 0000 signed 16 bit 
+(defconstant MPG123_ENC_16      #x40)                                                 ; 0100 0000 Some 16 bit encoding...
+(defconstant MPG123_ENC_SIGNED  #x80)                                                 ; 1000 0000 Some signed encoding...
+(defconstant MPG123_ENC_8       #x0f)                                                 ; 0000 1111 Some 8 bit encoding...
+(defconstant MPG123_ENC_SIGNED_16    (logior MPG123_ENC_16 MPG123_ENC_SIGNED #x10))   ; 1101 0000 signed 16 bit
 (defconstant MPG123_ENC_UNSIGNED_16  (logior MPG123_ENC_16 #x20))                     ; 0110 0000 unsigned 16 bit
 (defconstant MPG123_ENC_UNSIGNED_8   #x01)                                            ; 0000 0001 unsigned 8 bit
 (defconstant MPG123_ENC_SIGNED_8     (logior MPG123_ENC_SIGNED #x02))                 ; 1000 0010 signed 8 bit
 (defconstant MPG123_ENC_ULAW_8       #x04)                                            ; 0000 0100 ulaw 8 bit
-(defconstant MPG123_ENC_ALAW_8       #x08)                                            ; 0000 1000 alaw 8 bit 
-(defconstant MPG123_ENC_ANY  
+(defconstant MPG123_ENC_ALAW_8       #x08)                                            ; 0000 1000 alaw 8 bit
+(defconstant MPG123_ENC_ANY
   (logior MPG123_ENC_SIGNED_16 MPG123_ENC_UNSIGNED_16
           MPG123_ENC_UNSIGNED_8 MPG123_ENC_SIGNED_8
           MPG123_ENC_ULAW_8 MPG123_ENC_ALAW_8))
@@ -504,15 +504,15 @@
 
 ;;; Return the full (expected) length in samples of the current track,
 ;;; if it can be determined.
-(defcfun mpg123-length off_t 
+(defcfun mpg123-length off_t
   (mh handleptr))
 
 ;;; Return the time per frame (in seconds)
-(defcfun mpg123-tpf :double 
+(defcfun mpg123-tpf :double
   (mh handleptr))
 
 ;;; Get and reset the clip count.
-(defcfun mpg123-clip :long 
+(defcfun mpg123-clip :long
   (mh handleptr))
 
 ;;;; MPG123 strings library
@@ -523,11 +523,11 @@
   (fill size_t))
 
 ;;; Create and allocate memory for a new mpg123 string.
-(defcfun mpg123-init-string :void 
+(defcfun mpg123-init-string :void
   (sb (:pointer mpg123-string)))
 
 ;;; Free memory for an mpg123-string
-(defcfun mpg123-free-string :void 
+(defcfun mpg123-free-string :void
   (sb (:pointer mpg123-string)))
 
 ;;; Resize mpg123 string. Returns 1 on success, 0 on error.
@@ -540,7 +540,7 @@
   (from (:pointer mpg123-string))
   (to   (:pointer mpg123-string)))
 
-;;; Append a C (or Lisp) string to an mpg123 string. 
+;;; Append a C (or Lisp) string to an mpg123 string.
 ;;; Returns 1 on success, 0 on error.
 (defcfun mpg123-add-string :int
   (stem (:pointer mpg123-string))
@@ -605,7 +605,7 @@
 (defcfun mpg123-id3 :int
   (mh handleptr)
   (v1 (:pointer (:pointer mpg123-id3v1)))
-  (v2 (:pointer (:pointer mpg123-id3v2))))  
+  (v2 (:pointer (:pointer mpg123-id3v2))))
 
 ;;; Query ICY data. icy-meta is pointed to an existing data structure
 ;;; which may change after the next read/decode call.
@@ -623,9 +623,9 @@
 (defvar *libmpg123-initialized* nil)
 
 (defun ensure-libmpg123-initialized ()
-  "Ensure libmpg123 is initialized. Not thread safe, although once 
+  "Ensure libmpg123 is initialized. Not thread safe, although once
 initialized the library can be used in a threaded fashion."
-  (unless *libmpg123-initialized* 
+  (unless *libmpg123-initialized*
     (check-mpg123-plain-error "libmpg123 initialization" (mpg123-init))
     (setf *libmpg123-initialized* t))
   (values))
@@ -637,13 +637,13 @@ initialized the library can be used in a threaded fashion."
   "If true, always convert id3 values as ISO-8859-1.")
 
 #+NIL
-(defun safely-convert-string (c-string-ptr encoding 
+(defun safely-convert-string (c-string-ptr encoding
                               &optional (max-length (1- array-total-size-limit)))
   "Safely convert a C string to a lisp string under the specified
 encoding, returning NIL if the conversion can not be performed. If
 successful, returns two values: the converted lisp string, and the
 encoding."
-  (handler-case (values (foreign-string-to-lisp c-string-ptr 
+  (handler-case (values (foreign-string-to-lisp c-string-ptr
                                                 :encoding encoding
                                                 :max-chars max-length)
                         encoding)
@@ -674,13 +674,13 @@ encoding."
        (let ((ptr (funcall v2-accessor v2)))
          (and (not (null-pointer-p ptr))
               (trim-if-string
-               (magic-string-conversion (mpg123-string-data ptr) 
+               (magic-string-conversion (mpg123-string-data ptr)
                                         :no-utf8 *id3-no-unicode*))))))
 
 (defun get-id3v1-field (v1 v1-slot-name v1-field-width)
   (and (not (null-pointer-p v1))
-       (trim-if-string 
-        (safely-convert-string 
+       (trim-if-string
+        (safely-convert-string
          (foreign-slot-pointer v1 'mpg123-id3v1 v1-slot-name)
          :iso-8859-1 v1-field-width))))
 
@@ -690,27 +690,27 @@ encoding."
 
 (defparameter *id3v1-genres*
   #("Blues" "Classic Rock" "Country" "Dance" "Disco" "Funk" "Grunge" "Hip-Hop"
-    "Jazz" "Metal" "New Age" "Oldies" "Other" "Pop" "R&B" "Rap" "Reggae" 
-    "Rock" "Techno" "Industrial" "Alternative" "Ska" "Death Metal" "Pranks" 
-    "Soundtrack" "Euro-Techno" "Ambient" "Trip-Hop" "Vocal" "Jazz+Funk" 
-    "Fusion" "Trance" "Classical" "Instrumental" "Acid" "House" "Game" 
+    "Jazz" "Metal" "New Age" "Oldies" "Other" "Pop" "R&B" "Rap" "Reggae"
+    "Rock" "Techno" "Industrial" "Alternative" "Ska" "Death Metal" "Pranks"
+    "Soundtrack" "Euro-Techno" "Ambient" "Trip-Hop" "Vocal" "Jazz+Funk"
+    "Fusion" "Trance" "Classical" "Instrumental" "Acid" "House" "Game"
     "Sound Clip" "Gospel" "Noise" "AlternRock" "Bass" "Soul" "Punk" "Space"
     "Meditative" "Instrumental Pop" "Instrumental Rock" "Ethnic" "Gothic"
-    "Darkwave" "Techno-Industrial" "Electronic" "Pop-Folk" "Eurodance" 
+    "Darkwave" "Techno-Industrial" "Electronic" "Pop-Folk" "Eurodance"
     "Dream" "Southern Rock" "Comedy" "Cult" "Gangsta" "Top 40" "Christian Rap"
-    "Pop/Funk" "Jungle" "Native American" "Cabaret" "New Wave" "Psychadelic" 
-    "Rave" "Showtunes" "Trailer" "Lo-Fi" "Tribal" "Acid Punk" "Acid Jazz" 
+    "Pop/Funk" "Jungle" "Native American" "Cabaret" "New Wave" "Psychadelic"
+    "Rave" "Showtunes" "Trailer" "Lo-Fi" "Tribal" "Acid Punk" "Acid Jazz"
     "Polka" "Retro" "Musical" "Rock & Roll" "Hard Rock" "Folk" "Folk-Rock"
     "National Folk" "Swing" "Fast Fusion" "Bebob" "Latin" "Revival" "Celtic"
-    "Bluegrass" "Avantgarde" "Gothic Rock" "Progressive Rock" 
-    "Psychedelic Rock" "Symphonic Rock" "Slow Rock" "Big Band" "Chorus" 
-    "Easy Listening" "Acoustic" "Humour" "Speech" "Chanson" "Opera" 
+    "Bluegrass" "Avantgarde" "Gothic Rock" "Progressive Rock"
+    "Psychedelic Rock" "Symphonic Rock" "Slow Rock" "Big Band" "Chorus"
+    "Easy Listening" "Acoustic" "Humour" "Speech" "Chanson" "Opera"
     "Chamber Music" "Sonata" "Symphony" "Booty Bass" "Primus" "Porn Groove"
-    "Satire" "Slow Jam" "Club" "Tango" "Samba" "Folklore" "Ballad" 
-    "Power Ballad" "Rhythmic Soul" "Freestyle" "Duet" "Punk Rock" "Drum Solo" 
+    "Satire" "Slow Jam" "Club" "Tango" "Samba" "Folklore" "Ballad"
+    "Power Ballad" "Rhythmic Soul" "Freestyle" "Duet" "Punk Rock" "Drum Solo"
     "A capella" "Euro-House" "Dance Hall"))
 
-(defun translate-id3v1-genre (integer)  
+(defun translate-id3v1-genre (integer)
   (and (< integer (length *id3v1-genres*))
        (aref *id3v1-genres* integer)))
 
@@ -725,7 +725,7 @@ encoding."
                        (foreign-slot-value v1 'mpg123-id3v1 'genre))))
     ;; Work around stupid numeric v2 genres that some program creates:
     (when (and (>= (length v2-genre) 3)
-               (char= (aref v2-genre 0) #\()            
+               (char= (aref v2-genre 0) #\()
                (digit-char-p (aref v2-genre 1)))
       (let ((n (parse-integer v2-genre :start 1 :junk-allowed t :radix 10)))
         (setf v2-genre (and n (translate-id3v1-genre n)))))
@@ -754,13 +754,13 @@ encoding."
         as this-id = (safely-convert-string
                       (foreign-slot-pointer text-ptr 'mpg123-text 'id) :iso-8859-1 4)
         when (equal id this-id)
-        do (return 
+        do (return
              (convert-mpg123-string (foreign-slot-pointer text-ptr 'mpg123-text 'text)))))
 
 (defun dump-mpg123-texts (group array-ptr n)
   (dotimes (i n)
     (dump-mpg123-text group i
-     (inc-pointer array-ptr 
+     (inc-pointer array-ptr
                   (* i (foreign-type-size 'mpg123-text))))))
 
 (defun get-track (v1 v2)
@@ -791,8 +791,8 @@ encoding."
          year))))
 
 (defun get-tags-from-handle (handle &key print-misc-tags (no-utf8 nil))
-"Parse ID3 from the given mpg123 handle and return some subset of 
-title, artist, album, year, comment, tack, and genre as a property 
+"Parse ID3 from the given mpg123 handle and return some subset of
+title, artist, album, year, comment, tack, and genre as a property
 list."
   (with-foreign-objects ((v1p '(:pointer mpg123-id3v1))
                          (v2p '(:pointer mpg123-id3v2)))
@@ -807,7 +807,7 @@ list."
               (:year    id3v2-year    year     4)
               (:comment id3v2-comment comment 30))
             as value = (id3-field-best-value v1 v2 v2-accessor v1-slot v1-field-width)
-            when value 
+            when value
             nconcing (list keyword value) into properties
             finally
             ;; Cleanup obviously bogus tags.
@@ -816,7 +816,7 @@ list."
               (if year
                   (setf (getf properties :year) year)
                   (remf properties :year)))
-            (setf properties (nconc properties 
+            (setf properties (nconc properties
                                     (property :track (get-track v1 v2))
                                     (property :genre (get-genre v1 v2))))
             ;; No such thing as track 0. Some files have track in comment field.
@@ -832,8 +832,8 @@ list."
               (dump-mpg123-texts "Extra"   (id3v2-extra v2)        (id3v2-extras v2)))
             (return (clean-tags properties))))))
 
-(defun get-tags-from-file (filename &key 
-                           verbose 
+(defun get-tags-from-file (filename &key
+                           verbose
                            (character-encoding :iso-8859-1)
                            (no-utf8 nil))
   "Parse ID3 tags of the given file and return some subset of title,
@@ -846,9 +846,9 @@ artist, album, year, comment, tack, and genre as a property list."
         (mpg123-param handle :add-flags MPG123_QUIET 0.0d0))
       (with-foreign-string (unmangled filename :encoding character-encoding)
         (check-mh-error "mpg123 open file" handle (mpg123-open handle unmangled)))
-      (unwind-protect 
+      (unwind-protect
            (progn
-             (mpg123-getformat handle)                  
+             (mpg123-getformat handle)
              (get-tags-from-handle handle :no-utf8 no-utf8))
         (mpg123-close handle)
         (mpg123-delete handle)))))
@@ -863,7 +863,7 @@ artist, album, year, comment, tack, and genre as a property list."
   (with-foreign-object (err :int)
     (let ((handle (mpg123-new (null-pointer) err)))
       (check-mpg123-plain-error "mpg123-new" (mem-ref err :int))
-      (unless verbose 
+      (unless verbose
         (mpg123-param handle :add-flags MPG123_QUIET 0.0d0))
       (with-foreign-string (unmangled filename :encoding character-encoding)
         (check-mh-error "mpg123 open file" handle (mpg123-open handle unmangled)))
@@ -885,7 +885,7 @@ artist, album, year, comment, tack, and genre as a property list."
                              (setf (aref buffer outidx)
                                    (mem-aref cbuffer :short index)))
                        (incf idx num-samples)
-                       finally 
+                       finally
                        (when (and (< idx length) (/= err -12))  ; MPG123_DONE?
                          (cerror "Ignore it." "Unexpected decoding error ~D!" err))
                        (return-from decode-mp3-file
