@@ -143,7 +143,7 @@ streamers from a mixer.</p>
 
 
 <div class="def"><a name='main-thread-init'>Function</a>
-                       <b>main-thread-init</b> 
+                       <b>main-thread-init</b>
  <div class="docbody">
    <p>Initialize the platform's audio subsystem. This must be called
    from the main thread of the application. Under SBCL, this will be
@@ -163,20 +163,20 @@ streamers from a mixer.</p>
 </div>
 
 <div class="def"><a name='create-mixer'>Function</a>
-                       <b>create-mixer</b> 
- <i><tt>&amp;key</tt> (rate 44100)</i> &rArr; 
+                       <b>create-mixer</b>
+ <i><tt>&amp;key</tt> (rate 44100)</i> &rArr;
  <i>mixer</i>
  <div class="docbody">
    <p>Creates a mixer running at the specified sampling <i>rate</i>,
    and returns it. The default ALSA device is opened and a thread for
    the mixer is started. The chosen sample <i>rate</i> should match
-   the sampling rate of the data you intend to play through the mixer - 
+   the sampling rate of the data you intend to play through the mixer -
    the Mixalot mixer does not perform resampling.</p>
  </div>
 </div>
 
 <div class="def"><a name='destroy-mixer'>Function</a>
-                       <b>destroy-mixer</b> 
+                       <b>destroy-mixer</b>
  <i>mixer</i>
  <div class="docbody">
    <p>Requests that <i>mixer</i> be shut down. This will occur after
@@ -191,7 +191,7 @@ streamers from a mixer.</p>
 </div>
 
 <div class="def"><a name='mixer-add-streamer'>Function</a>
-                       <b>mixer-add-streamer</b> 
+                       <b>mixer-add-streamer</b>
  <i>mixer streamer</i> &rArr;
  <i>streamer start-time</i>
  <div class="docbody">
@@ -221,7 +221,7 @@ streamers from a mixer.</p>
 </div>
 
 <div class="def"><a name='mixer-remove-all-streamers'>Function</a>
-                       <b>mixer-remove-all-streamers</b> 
+                       <b>mixer-remove-all-streamers</b>
  <i>mixer</i>
  <div class="docbody">
    <p>Removes all streamers belonging to the <i>mixer</i>.</p>
@@ -229,7 +229,7 @@ streamers from a mixer.</p>
 </div>
 
 <div class="def"><a name="mixer-current-time">Function</a>
-                       <b>mixer-current-time</b> 
+                       <b>mixer-current-time</b>
  <i>mixer</i> &rArr; <i>time</i>
  <div class="docbody">
    <p>Returns the <i>time</i>, measured in samples, since the mixer was created.</p>
@@ -237,7 +237,7 @@ streamers from a mixer.</p>
 </div>
 
 <div class="def"><a name="mixer-rate">Function</a>
-                       <b>mixer-rate</b> 
+                       <b>mixer-rate</b>
  <i>mixer</i> &rArr; <i>rate</i>
  <div class="docbody">
    <p>Returns the sampling <i>rate</i> in Hertz of the output and inputs to the mixer. </p>
@@ -248,7 +248,7 @@ streamers from a mixer.</p>
 
 <p>A streamer is any object serving as a source of samples which are mixed into the mixer's audio
 buffer by implementing the <a href="#mix_BasicStreamerProtocol">Basic Streamer Protocol</a>.
-  From the mixer thread, the 
+  From the mixer thread, the
 functions <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>
 and <a href="#streamer-write-into"><tt>streamer-write-into</tt></a>
 are called periodically to generate audio. These two functions correspond to the cases of multiple or a single streamer being mixed, respectively, and it is only necessary to implement <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>.</p>
@@ -268,7 +268,7 @@ are called periodically to generate audio. These two functions correspond to the
             with freq = (+ 200 (* n 200))
             with dp = (* 2.0 pi freq 1/44100)
             as sample = (round (* 5000 (sin phase)))
-            do            
+            do
             (mixalot:stereo-incf (aref buffer index) (mixalot:mono->stereo sample))
             (incf phase dp))
       (incf n)
@@ -284,7 +284,7 @@ CL-USER> (defparameter *mixer* (mixalot:create-mixer))
 CL-USER> (mixer-add-streamer *mixer* (make-test-streamer))
 #&lt;CLOSURE (LAMBDA (STREAMER MIXER BUFFER ...)) {1003F045A9}&gt;
 507904
-CL-USER> 
+CL-USER>
 </pre>
 
 <p>Here is the same streamer, implemented via classes and methods:</p>
@@ -292,7 +292,7 @@ CL-USER>
 <pre class="lisp">
 (defclass test-streamer ()
   ((n     :initform 0)
-   (phase :initform 0.0)))   
+   (phase :initform 0.0)))
 
 (defmethod mixalot:streamer-mix-into ((streamer test-streamer) mixer buffer offset length time)
   (declare (ignore time))
@@ -302,7 +302,7 @@ CL-USER>
           with freq = (+ 200 (* n 200))
           with dp = (* 2.0 pi freq 1/44100)
           as sample = (round (* 5000 (sin phase)))
-          do            
+          do
           (mixalot:stereo-incf (aref buffer index) (mixalot:mono->stereo sample))
           (incf phase dp))
     (when (= (incf n) 6)
@@ -314,12 +314,12 @@ CL-USER>
 <p>These generic functions define the essential behaviors of an audio streamer. Of them, only <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a> is mandatory to implement.</p>
 
 <div class="def"><a name="streamer-mix-into">Generic Function</a>
-                       <b>streamer-mix-into</b> 
+                       <b>streamer-mix-into</b>
  <i>streamer mixer buffer offset length time</i>
  <div class="docbody">
-   <p>Generate <i>length</i> samples of audio from <i>streamer</i>. 
+   <p>Generate <i>length</i> samples of audio from <i>streamer</i>.
     The audio should be mixed into the provided <i>buffer</i> (of type
-   <a href="#sample-vector"><tt>sample-vector</tt></a>) starting from <i>offset</i>. 
+   <a href="#sample-vector"><tt>sample-vector</tt></a>) starting from <i>offset</i>.
    <i>Time</i> indicates the time in samples since the creation of the <i>mixer</i>.</p>
    <p>The provided <a href="#mix-stereo-samples"><tt>mix-stereo-samples</tt></a> function
    or <a href="#stereo-mixf"><tt>stereo-mixf</tt></a> macro can be used for mixing samples.</p>
@@ -330,16 +330,16 @@ CL-USER>
 </div>
 
 <div class="def"><a name="streamer-write-into">Generic Function</a>
-                       <b>streamer-write-into</b> 
+                       <b>streamer-write-into</b>
  <i>streamer mixer buffer offset length time</i>
  <div class="docbody">
-   <p>Generate <i>length</i> samples of audio from <i>streamer</i>. 
-   The contents of <i>buffer</i> (of type <a href="#sample-vector"><tt>sample-vector</tt></a>) 
+   <p>Generate <i>length</i> samples of audio from <i>streamer</i>.
+   The contents of <i>buffer</i> (of type <a href="#sample-vector"><tt>sample-vector</tt></a>)
    may be invalid and must be overwritten (not mixed into) starting from <i>offset</i>.
    This method exists as an optimization for the case of the first or only playing streamer,
    to avoid redundant zero-filling of the <i>buffer</i> and unnecessary mixing. The default
    method fills the buffer with zeros then calls <a href="#streamer-mix-into"><tt>streamer-mix-into</tt></a>,
-   so implementing a more specific method for this is optional.    
+   so implementing a more specific method for this is optional.
    <i>Time</i> indicates the time in samples since the creation of the <i>mixer</i></p>
    <p>When a <i>streamer</i> has completed playback, it can call
    <a href="#mixer-remove-streamer"><tt>mixer-remove-streamer</tt></a>
@@ -349,7 +349,7 @@ CL-USER>
 
 
 <div class="def"><a name="streamer-cleanup">Generic Function</a>
-                       <b>streamer-cleanup</b> 
+                       <b>streamer-cleanup</b>
  <i>streamer mixer</i>
  <div class="docbody">
    <p>Notification that <i>streamer</i> has been removed from the <i>mixer</i>, and its streamer
@@ -378,7 +378,7 @@ CL-USER>
 
 
 <div class="def"><a name="streamer-unpause">Generic Function</a>
-                       <b>streamer-unpause</b> 
+                       <b>streamer-unpause</b>
  <i>streamer mixer</i>
  <div class="docbody">
   <p>Unpause playback of the <i>streamer</i> through the <i>mixer</i>. If <i>streamer</i> is already playing, it continues to play.</p>
@@ -387,8 +387,8 @@ CL-USER>
 
 
 <div class="def"><a name="streamer-paused-p">Generic Function</a>
-                       <b>streamer-paused-p</b> 
- <i>streamer mixer</i> &rArr; 
+                       <b>streamer-paused-p</b>
+ <i>streamer mixer</i> &rArr;
  <i>boolean</i>
  <div class="docbody">
  <p>Returns true if playback of the <i>streamer</i> through the <i>mixer</i> is currently paused.</p>
@@ -398,15 +398,15 @@ CL-USER>
 
 <h4><a name="mix_SeekableProtocol"></a>Seekable Protocol</h4>
 
-<p>Some streamers may have the ability to seek to an offset during 
-playback. These streamers must implement the Seekable protocol, 
-comprised of the functions below. Users can call these functions to 
+<p>Some streamers may have the ability to seek to an offset during
+playback. These streamers must implement the Seekable protocol,
+comprised of the functions below. Users can call these functions to
 control and query stream position and length.
 </p>
 
 <div class="def"><a name="streamer-seekable-p">Generic Function</a>
                        <b>streamer-seekable-p</b>
- <i>streamer mixer</i> &rArr; 
+ <i>streamer mixer</i> &rArr;
  <i>boolean</i>
  <div class="docbody">
    <p>Returns true is the <i>streamer</i> is seekable. Attempting to
@@ -416,8 +416,8 @@ control and query stream position and length.
 </div>
 
 <div class="def"><a name="streamer-length">Generic Function</a>
-                       <b>streamer-length</b> 
- <i>streamer mixer</i> &rArr; 
+                       <b>streamer-length</b>
+ <i>streamer mixer</i> &rArr;
  <i>length-or-nil</i>
  <div class="docbody">
   <p>Returns the length, in samples, of the <i>streamer</i>. If this
@@ -461,30 +461,30 @@ functions construct these streamers:
 </p>
 
 <div class="def"><a name="make-vector-streamer-mono">Function</a>
-                       <b>make-vector-streamer-mono</b> 
- <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+                       <b>make-vector-streamer-mono</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
  <i>vector-streamer</i>
  <div class="docbody">
   <p>Creates a <i>vector-streamer</i> streaming 16-bit mono audio from
-  a range of <i>vector</i> defined by <i>start</i> and <i>end</i>.</p> 
+  a range of <i>vector</i> defined by <i>start</i> and <i>end</i>.</p>
  </div>
 </div>
 
 <div class="def"><a name="make-fast-vector-streamer-mono">Function</a>
-                       <b>make-fast-vector-streamer-mono</b> 
- <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+                       <b>make-fast-vector-streamer-mono</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
  <i>vector-streamer</i>
  <div class="docbody">
   <p>Creates a <i>vector-streamer</i> streaming 16-bit mono audio from
-  a range of <i>vector</i> defined by <i>start</i> and <i>end</i>. 
-  <i>Vector</i> is assumed to be of type <tt>(simple-array (signed-byte 16) 1)</tt>.</p> 
+  a range of <i>vector</i> defined by <i>start</i> and <i>end</i>.
+  <i>Vector</i> is assumed to be of type <tt>(simple-array (signed-byte 16) 1)</tt>.</p>
  </div>
 </div>
 
 
 <div class="def"><a name="make-vector-streamer-interleaved-stereo">Function</a>
-                       <b>make-vector-streamer-interleaved-stereo</b> 
- <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+                       <b>make-vector-streamer-interleaved-stereo</b>
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
  <i>vector-streamer</i>
  <div class="docbody">
   <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
@@ -497,7 +497,7 @@ functions construct these streamers:
 </div>
 
 <div class="def"><a name="make-fast-vector-streamer-interleaved-stereo">Function</a>
-                       <b>make-fast-vector-streamer-interleaved-stereo</b> 
+                       <b>make-fast-vector-streamer-interleaved-stereo</b>
  <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
  <i>vector-streamer</i>
  <div class="docbody">
@@ -514,7 +514,7 @@ functions construct these streamers:
 
 <div class="def"><a name="make-vector-streamer-joint-stereo">Function</a>
                        <b>make-vector-streamer-joint-stereo</b>
- <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
  <i>vector-streamer</i>
  <div class="docbody">
   <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
@@ -525,7 +525,7 @@ functions construct these streamers:
 
 <div class="def"><a name="make-fast-vector-streamer-joint-stereo">Function</a>
                        <b>make-fast-vector-streamer-joint-stereo</b>
- <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr; 
+ <i>vector <tt>&amp;optional</tt> (start 0) (end (length vector))</i> <br>&rArr;
  <i>vector-streamer</i>
  <div class="docbody">
   <p>Creates a <i>vector-streamer</i> streaming 16-bit stereo audio
@@ -575,9 +575,9 @@ but the sampling rate may vary. The following type definitions relate
 to samples and audio buffers:</p>
 
 <div class="def"><a name="mono-sample">Type</a>
-                       <b>mono-sample</b> 
+                       <b>mono-sample</b>
  <div class="docbody">
-<pre>(deftype mono-sample () 
+<pre>(deftype mono-sample ()
   '(or (signed-byte 16)
        (unsigned-byte 16)))</pre>
  <p>A mono sample is typically represented as a <tt>(signed-byte
@@ -587,7 +587,7 @@ to samples and audio buffers:</p>
 </div>
 
 <div class="def"><a name='stereo-sample'>Type</a>
-                       <b>stereo-sample</b> 
+                       <b>stereo-sample</b>
  <div class="docbody">
    <pre>(deftype stereo-sample () '(unsigned-byte 32))</pre>
    <p>This is the native representation of audio in Mixalot. Two
@@ -598,9 +598,9 @@ to samples and audio buffers:</p>
 </div>
 
 <div class="def"><a name='sample-vector'>Type</a>
-                       <b>sample-vector</b> 
+                       <b>sample-vector</b>
  <div class="docbody">
-   <pre>(deftype sample-vector () '(simple-array stereo-sample 1))</pre>     
+   <pre>(deftype sample-vector () '(simple-array stereo-sample 1))</pre>
    <p>The <tt>sample-vector</tt> type denotes specialized one-dimensional simple-arrays of stereo samples.</p>
  </div>
 </div>
@@ -613,17 +613,17 @@ of this writing (using SBCL 1.0.28.27/x86_64).</p>
 
 
 <div class="def"><a name="stereo-sample">Function</a>
-                       <b>stereo-sample</b> 
+                       <b>stereo-sample</b>
  <i>left right</i> &rArr; <i>sample</i>
  <div class="docbody">
-   <p>Construct a <a href="#stereo-sample"><tt>stereo-sample</tt></a> 
+   <p>Construct a <a href="#stereo-sample"><tt>stereo-sample</tt></a>
      from separate <i>left</i> and <i>right</i> components, each
      a <a href="#mono-sample"><tt>mono-sample</tt></a>.
  </div>
 </div>
 
 <div class="def"><a name="mono->stereo">Function</a>
-                       <b>mono->stereo</b> 
+                       <b>mono->stereo</b>
  <i>mono-sample</i> &rArr; <i>stereo-sample</i>
  <div class="docbody">
    <p>Expand a <a href="#mono-sample"><tt>mono-sample</tt></a> to
@@ -634,7 +634,7 @@ of this writing (using SBCL 1.0.28.27/x86_64).</p>
 </div>
 
 <div class="def"><a name="stereo-left">Function</a>
-                       <b>stereo-left</b> 
+                       <b>stereo-left</b>
  <i>stereo-sample</i> &rArr; <i>left</i>
  <div class="docbody">
    <p>Returns the <i>left</i> channel component of a <a href="#stereo-sample"><tt>stereo-sample</tt></a>.</p>
@@ -642,7 +642,7 @@ of this writing (using SBCL 1.0.28.27/x86_64).</p>
 </div>
 
 <div class="def"><a name="stereo-right">Function</a>
-                       <b>stereo-right</b> 
+                       <b>stereo-right</b>
  <i>stereo-sample</i> &rArr; <i>right</i>
  <div class="docbody">
    <p>Returns the <i>right</i> channel component of a <a href="#stereo-sample"><tt>stereo-sample</tt></a>.</p>
@@ -650,7 +650,7 @@ of this writing (using SBCL 1.0.28.27/x86_64).</p>
 </div>
 
 <div class="def"><a name="split-sample">Function</a>
-                       <b>split-sample</b> 
+                       <b>split-sample</b>
  <i>stereo-sample</i> &rArr; <i>left right</i>
  <div class="docbody">
    <p>Returns two values, the <i>left</i> and <i>right</i> components
@@ -675,11 +675,11 @@ of this writing (using SBCL 1.0.28.27/x86_64).</p>
 </div>
 
 <div class="def"><a name="add-stereo-samples">Function</a>
-                       <b>add-stereo-samples</b> 
+                       <b>add-stereo-samples</b>
  <i>x y</i> &rArr; <i>unclamped-sum</i>
  <div class="docbody">
    <p>Returns the pairwise sum of the <a href="#stereo-sample"><tt>stereo-samples</tt></a>
-   <i>x</i> and <i>y</i>, without clipping. The sums of the individual channels may wrap, 
+   <i>x</i> and <i>y</i>, without clipping. The sums of the individual channels may wrap,
    but will not overflow into the other channel.</p>
  </div>
 </div>
@@ -694,7 +694,7 @@ of this writing (using SBCL 1.0.28.27/x86_64).</p>
 </div>
 
 <div class="def"><a name="stereo-incf">Macro</a>
-                       <b>stereo-incf</b> 
+                       <b>stereo-incf</b>
  <i>place sample</i> &rArr; <i>sum</i>
  <div class="docbody">
    <p>Increment the contents of <i>place</i> (a <a href="#stereo-sample"><tt>stereo-sample</tt></a>)
@@ -760,7 +760,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 </div>
 
 <div class="def"><a name="mpg123-handle-error">Condition</a>
-                       <b>mpg123-handle-error</b> 
+                       <b>mpg123-handle-error</b>
  (inherits from <a href="#mpg123-error"><tt>mpg123-error</tt></a>)
  <div class="docbody">
    <p>An error from the mpg123 library in the context of a handle.</p>
@@ -768,7 +768,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 </div>
 
 <div class="def"><a name="check-mpg123-plain-error">Function</a>
-                       <b>check-mpg123-plain-error</b> 
+                       <b>check-mpg123-plain-error</b>
  <i>circumstance code</i>
  <div class="docbody">
    <p>Examines the <i>code</i> returned by a call to libmpg123 (excluding
@@ -782,14 +782,14 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 </div>
 
 <div class="def"><a name="check-mh-error">Function</a>
-                       <b>check-mh-error</b> 
+                       <b>check-mh-error</b>
  <i>circumstance handle value</i>
  <div class="docbody">
    <p>Examines the <i>value</i> returned by a call (in the context of the mpg123_handle pointer <i>handle</i>)
    to libmpg123. If it indicates an error, it translates the error to a descriptive string and signals an error of
    type <a href="#mpg123-handle-error"><tt>mpg123-handle-error</tt></a>. <i>Circumstance</i>
    is a string, included in the error report, intended to indicate which
-   library call produced the error or what the programmer was attempting to do. 
+   library call produced the error or what the programmer was attempting to do.
    If no error occurred, <i>value</i> is returned.
    </p>
  </div>
@@ -797,7 +797,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 
 
 <div class="def"><a name="mpg123-decoders">Function</a>
-                       <b>mpg123-decoders</b> 
+                       <b>mpg123-decoders</b>
  &rArr; <i>decoders</i>
  <div class="docbody">
    <p>Returns a list of generally available <i>decoders</i>.</p>
@@ -805,7 +805,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 </div>
 
 <div class="def"><a name="mpg123-supported-decoders">Function</a>
-                       <b>mpg123-supported-decoders</b> 
+                       <b>mpg123-supported-decoders</b>
  &rArr; <i>decoders</i>
  <div class="docbody">
    <p>Returns a list of <i>decoders</i> supported by the CPU.</p>
@@ -813,7 +813,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 </div>
 
 <div class="def"><a name="mpg123-getformat">Function</a>
-                       <b>mpg123-getformat</b> 
+                       <b>mpg123-getformat</b>
  <i>handle</i> &rArr; <i>rate channels encoding</i>
  <div class="docbody">
    <p>Given a <i>handle</i> with an opened file, returns three
@@ -858,7 +858,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
 
 
 <div class="def"><a name="get-tags-from-file">Function</a>
-                       <b>get-tags-from-file</b> 
+                       <b>get-tags-from-file</b>
  <i>filename <tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> &rArr; <i>plist</i>
  <div class="docbody">
    <p>Open an MP3 file, examine its tags
@@ -871,7 +871,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
       the <i>filename</i> string with this in mind. You can change this
       behavior using the <tt>:character-encoding</tt> keyword, which can take any valid
       <a href="http://common-lisp.net/project/babel/">Babel</a> encoding specifier
-      (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice 
+      (another reasonable choice is <tt>:utf-8b</tt>, but again, this choice
       should be congruent with how the string was obtained from the filesystem).
    </p>
  </div>
@@ -882,7 +882,7 @@ below. For all other functions, see <tt>mpg123.lisp</tt>.
  <i>filename <tt>&amp;key</tt> verbose (character-encoding :iso-8859-1)</i> &rArr; <i>vector rate channels encoding</i>
  <div class="docbody">
    <p>Opens and decodes an MP3 file, returning a <i>vector</i> of
-   samples, a <tt>(simple-array (signed-byte 16) 1)</tt>, interleaved, with one array 
+   samples, a <tt>(simple-array (signed-byte 16) 1)</tt>, interleaved, with one array
    element per channel.
    The <tt>:character-encoding</tt> keyword chooses how the <i>filename</i> is encoded as a C string.
    Additionally, the <i>rate</i>, <i>channels</i>, and <i>encoding</i> () of the file are returned (see <a href="#mpg123-getformat">mpg123-getformat</a>).
@@ -900,7 +900,7 @@ decoding and playback of MP3 files from disk. The following functions
 reside in the <tt>mixalot-mp3</tt> package:</p>
 
 <div class="def"><a name="mp3-streamer">Class</a>
-                       <b>mp3-streamer</b> 
+                       <b>mp3-streamer</b>
  <div class="docbody">
    <p>A seekable Mixalot streamer for playing MP3 files.</p>
  </div>
@@ -938,7 +938,7 @@ reside in the <tt>mixalot-mp3</tt> package:</p>
 </div>
 
 <div class="def"><a name="mp3-streamer-release-resources">Function</a>
-                       <b>mp3-streamer-release-resources</b> 
+                       <b>mp3-streamer-release-resources</b>
  <i>mp3-streamer</i>
  <div class="docbody">
    <p>Release foreign resources held by the <i>mp3-streamer</i>. In
@@ -951,7 +951,7 @@ reside in the <tt>mixalot-mp3</tt> package:</p>
 </div>
 
 <div class="def"><a name="mp3-sample-rate">Function</a>
-                       <b>mp3-sample-rate</b> 
+                       <b>mp3-sample-rate</b>
  <i>mp3-streamer</i> &rArr; <i>rate</i>
  <div class="docbody">
    <p>Returns the native sampling <i>rate</i> of the file behind an <i>mp3-streamer</i>. This may be different from the output sampling rate.</p>
@@ -960,7 +960,7 @@ reside in the <tt>mixalot-mp3</tt> package:</p>
 
 <p>Example of creating and playing an MP3 stream:</p>
 <pre class='lisp'>
-CL-USER&gt; (mixalot:mixer-add-streamer *mixer* 
+CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
            (mixalot-mp3:make-mp3-streamer "/home/hefner/test.mp3"))
 #&lt;MIXALOT-MP3:MP3-STREAMER {10029B9A91}&gt;
 8463564800
@@ -1007,7 +1007,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="check-vorbis-error">Function</a>
-                       <b>check-vorbis-error</b> 
+                       <b>check-vorbis-error</b>
  <i>circumstance code</i>
  <div class="docbody">
    <p>Examines the <i>code</i> returned by a call to libvorbisfile. If it
@@ -1033,7 +1033,7 @@ while immediately doing some error checking. For all other functions, see
 
 
 <div class="def"><a name="vorbis-new">Function</a>
-                       <b>vorbis-new</b> 
+                       <b>vorbis-new</b>
  &rArr; <i>handle</i>
  <div class="docbody">
    <p>Allocates foreign resources for a new <i>handle</i> and returns it. This
@@ -1052,7 +1052,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-open">Function</a>
-                       <b>vorbis-open</b> 
+                       <b>vorbis-open</b>
  <i>filename handle <tt>&key</tt> (character-encoding :iso-8859-1)</i>
  <div class="docbody">
    <p>Open the file with the given <i>filename</i> and attach it to the given
@@ -1073,7 +1073,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-close">Function</a>
-                       <b>vorbis-close</b> 
+                       <b>vorbis-close</b>
  <i>handle</i>
  <div class="docbody">
    <p>Open the file with the given <i>filename</i> and attach it to the given
@@ -1085,7 +1085,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-seek">Function</a>
-                       <b>vorbis-seek</b> 
+                       <b>vorbis-seek</b>
  <i>handle position <tt>&amp;key</tt> (accurate t)</i>
  <div class="docbody">
    <p>In the Vorbis stream given by <i>handle</i>, seek to the given
@@ -1099,7 +1099,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-channels">Function</a>
-                       <b>vorbis-channels</b> 
+                       <b>vorbis-channels</b>
  <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>number-of-channels</i>
  <div class="docbody">
    <p>Returns an integer representing the <i>number-of-channels</i> in the
@@ -1111,7 +1111,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-rate">Function</a>
-                       <b>vorbis-rate</b> 
+                       <b>vorbis-rate</b>
  <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>sampling-rate</i>
  <div class="docbody">
    <p>Returns an integer representing the <i>sampling-rate</i> in Hz of the
@@ -1123,7 +1123,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-length">Function</a>
-                       <b>vorbis-length</b> 
+                       <b>vorbis-length</b>
  <i>handle <tt>&amp;key</tt> (link -1)</i> &rArr; <i>total-number-of-samples</i>
  <div class="docbody">
    <p>Returns an integer representing the <i>total-number-of-samples</i> in
@@ -1136,7 +1136,7 @@ while immediately doing some error checking. For all other functions, see
 </div>
 
 <div class="def"><a name="vorbis-position">Function</a>
-                       <b>vorbis-position</b> 
+                       <b>vorbis-position</b>
  <i>handle</i> &rArr; <i>sample-position</i>
  <div class="docbody">
    <p>Returns an integer representing the current <i>sample-position</i> in
@@ -1254,7 +1254,7 @@ at this moment, only mono and stereo Ogg Vorbis files with a sampling rate of
 </div>
 
 <div class="def"><a name="vorbis-streamer-release-resources">Function</a>
-                       <b>vorbis-streamer-release-resources</b> 
+                       <b>vorbis-streamer-release-resources</b>
  <i>vorbis-streamer</i>
  <div class="docbody">
    <p>Release foreign resources held by the <i>vorbis-streamer</i>. In normal
@@ -1266,7 +1266,7 @@ at this moment, only mono and stereo Ogg Vorbis files with a sampling rate of
 </div>
 
 <div class="def"><a name="vorbis-sample-rate">Function</a>
-                       <b>vorbis-sample-rate</b> 
+                       <b>vorbis-sample-rate</b>
  <i>vorbis-streamer</i> &rArr; <i>rate</i>
  <div class="docbody">
    <p>Returns the native sampling <i>rate</i> of the file behind a
@@ -1277,7 +1277,7 @@ at this moment, only mono and stereo Ogg Vorbis files with a sampling rate of
 
 <p>Example of creating and playing an Ogg Vorbis stream:</p>
 <pre class='lisp'>
-CL-USER&gt; (mixalot:mixer-add-streamer *mixer* 
+CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
            (mixalot-vorbis:make-vorbis-streamer "/home/soemraws/test.ogg"))
 #&lt;VORBIS-STREAMER {1002D80621}&gt;
 290816
@@ -1364,7 +1364,7 @@ playback. The <tt>mixalot-flac</tt> package provides the
 following:</p>
 
 <div class="def"><a name="flac-streamer">Class</a>
-                       <b>flac-streamer</b> 
+                       <b>flac-streamer</b>
  <div class="docbody">
    <p>A seekable Mixalot streamer for playing FLAC files.</p>
  </div>
@@ -1432,7 +1432,7 @@ CL-USER&gt; (mixalot:mixer-add-streamer *mixer*
  a copy of this software and associated documentation files (the
  "Software"), to deal in the Software without restriction, including
  without limitation the rights to use, copy, modify, merge, publish,
- distribute, sublicense, and/or sellcopies of the Software, and to 
+ distribute, sublicense, and/or sellcopies of the Software, and to
  permit persons to whom the Software is furnished to do so, subject
  to the following conditions:</p>
 
