@@ -52,6 +52,7 @@
            #:mixer-add-streamer
            #:mixer-remove-streamer
            #:mixer-remove-all-streamers
+           #:mixer-note-write
            #:create-mixer
            #:destroy-mixer
            #:array-index
@@ -505,6 +506,10 @@
 (defconstant +mixer-buffer-size+ 4096)
 (deftype mixer-buffer-index () `(integer 0 ,+mixer-buffer-size+))
 
+(defgeneric mixer-note-write (mixer buffer offset size)
+  (:method (mixer buffer offset size)
+    (declare (ignore mixer buffer offset size))))
+
 (defun run-mixer-process (mixer)
  (declare (optimize (speed 3)))
  (unwind-protect
@@ -544,6 +549,9 @@
                    (not buffer-clear))
           (fill buffer 0)
           (setf buffer-clear t))
+        ;; Notification of data written.
+        (mixer-note-write mixer buffer 0 buffer-samples)
+
         ;; Play the buffer.
         #+mixalot::use-ao
         (let ((ret
@@ -584,11 +592,11 @@
    (clrhash (mixer-stream-state mixer))
    (setf (mixer-stream-list mixer) nil)))
 
-(defun create-mixer (&key (rate 44100))
+(defun create-mixer (&key (rate 44100) (constructor 'make-mixer))
   "Create a new mixer at the specified sample rate, running in its own thread."
   #-(or mixalot::use-ao mixalot::use-alsa)
   (error "Neither mixalot::use-ao nor mixalot::use-alsa existed on *features* when this function was compiled. That is wrong.")
-  (let ((mixer (make-mixer :rate rate)))
+  (let ((mixer (funcall constructor :rate rate)))
     (bordeaux-threads:make-thread
      (lambda ()
        #+mixalot::use-ao
