@@ -622,7 +622,7 @@
 (declaim (inline stereo-sample sign-extend-16
                  clamp-sample clamp-sample+
                  mono->stereo stereo-left stereo-right
-                 %stereo-left %stereo-right
+                 stereo->mono %stereo-left %stereo-right
                  split-sample
                  mix-stereo-samples add-stereo-samples
                  scale-sample scale-stereo-sample))
