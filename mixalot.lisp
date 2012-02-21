@@ -59,6 +59,7 @@
            #:with-array-pointer
            #:clamp-sample #:clamp-sample+
            #:mono->stereo #:stereo-left #:stereo-right
+           #:stereo->mono
            #:%stereo-left #:%stereo-right
            #:split-sample
            #:mix-stereo-samples #:add-stereo-samples
@@ -632,7 +633,8 @@
   (logior (ldb (byte 16 0) left)
           (ash (ldb (byte 16 0) right) 16)))
 
-(defun mono->stereo (sample) (stereo-sample sample sample))
+(defun mono->stereo (sample)
+  (stereo-sample sample sample))
 
 (defun sign-extend-16 (x)
   (declare (optimize (speed 3))
@@ -641,23 +643,34 @@
     (logxor (+ x c) c)))
 
 (defun %stereo-left (sample)
-  (declare (optimize (speed 3)) (type stereo-sample sample))
+  (declare (optimize (speed 3))
+           (type stereo-sample sample))
   (ldb (byte 16 0)  sample))
 
 (defun %stereo-right (sample)
-  (declare (optimize (speed 3)) (type stereo-sample sample))
+  (declare (optimize (speed 3))
+           (type stereo-sample sample))
   (ldb (byte 16 16)  sample))
 
 (defun stereo-left (sample)
-  (declare (optimize (speed 3)) (type stereo-sample sample))
+  (declare (optimize (speed 3))
+           (type stereo-sample sample))
   (sign-extend-16 (%stereo-left  sample)))
 
 (defun stereo-right (sample)
-  (declare (optimize (speed 3)) (type stereo-sample sample))
+  (declare (optimize (speed 3))
+           (type stereo-sample sample))
   (sign-extend-16 (%stereo-right sample)))
 
+(defun stereo->mono (sample)
+  (declare (optimize (speed 3))
+           (type stereo-sample sample))
+  ;; SBCL doesn't do the best job on this on.
+  (ash (+ (stereo-left sample) (stereo-right sample)) -1))
+
 (defun split-sample (sample)
-  (values (stereo-left sample) (stereo-right sample)))
+  (values (stereo-left sample)
+          (stereo-right sample)))
 
 (defun clamp-sample (x) (min 32767 (max -32768 x)))
 (defun clamp-sample+ (x y) (clamp-sample (+ x y)))
