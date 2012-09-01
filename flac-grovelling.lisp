@@ -5,7 +5,9 @@
 (in-package :flac)
 
 (include "FLAC/stream_decoder.h")
-(cc-flags "-lFLAC" "-lm")
+(cc-flags "-lFLAC" "-lm"
+          #+darwin "-I/opt/local/include"
+          #+darwin "-L/opt/local/lib")
 
 ;;;; Basic types
 

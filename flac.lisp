@@ -25,6 +25,8 @@
 (in-package :flac)
 
 (define-foreign-library libFLAC
+  (:darwin (:or "libFLAC.dylib"
+                "/opt/local/lib/libFLAC.dylib"))
   (:unix (:or "libFLAC.so.8"
               "/usr/lib/libFLAC.so"
               "/usr/local/lib/libFLAC.so"))
