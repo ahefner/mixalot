@@ -436,7 +436,9 @@
 (defun %req-remove-streamer (mixer streamer)
   (setf (gethash streamer (mixer-stream-state mixer)) :remove))
 
-(defun mixer-remove-streamer (mixer streamer)
+(defgeneric mixer-remove-streamer (mixer streamer))
+
+(defmethod mixer-remove-streamer ((mixer mixer) streamer)
   (with-mixer-lock (mixer)
     (%req-remove-streamer mixer streamer))
   (values))
