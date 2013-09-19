@@ -67,6 +67,8 @@
            #:make-test-streamer
            #:dummy-mixer
            #:playback-finished
+           #:pf-length
+           #:signal-playback-finish
 
            #:vector-streamer
            #:vector-streamer-mono
@@ -512,8 +514,13 @@
 (deftype mixer-buffer-index () `(integer 0 ,+mixer-buffer-size+))
 
 (define-condition playback-finished ()
-  ()
+  ((length :initform nil :initarg :length :reader pf-length))
   (:documentation "Condition, which can be signalled by streamer to indicate, that it had finished its playback."))
+
+(defmacro signal-playback-finish (&optional (length (intern "LENGTH")))
+  "Convenience macro, which by default assumes, that LENGTH variable contains the length, that
+should be output in STREAMER-MIX-INTO or STREAMER-WRITE-INTO."
+  `(error 'playback-finished :length ,length))
 
 (defgeneric mixer-note-write (mixer buffer offset size)
   (:method (mixer buffer offset size)
@@ -861,7 +868,7 @@
 
 (defclass dummy-mixer ()
   ((rate :initform 44100 :initarg :rate)
-   (callback :initform nil :initarg :callback-on-streamer-remove :reader dummy-mixer-callback)))
+   (callback :initform (lambda () nil) :initarg :callback-on-streamer-remove :reader dummy-mixer-callback)))
 
 (defmethod mixer-remove-streamer ((mixer dummy-mixer) streamer)
   (declare (ignore streamer))
