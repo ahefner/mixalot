@@ -65,6 +65,8 @@
            #:mix-stereo-samples #:add-stereo-samples
            #:stereo-incf #:stereo-mixf
            #:make-test-streamer
+           #:dummy-mixer
+           #:playback-finished
 
            #:vector-streamer
            #:vector-streamer-mono
@@ -509,6 +511,10 @@
 (defconstant +mixer-buffer-size+ 4096)
 (deftype mixer-buffer-index () `(integer 0 ,+mixer-buffer-size+))
 
+(define-condition playback-finished ()
+  ()
+  (:documentation "Condition, which can be signalled by streamer to indicate, that it had finished its playback."))
+
 (defgeneric mixer-note-write (mixer buffer offset size)
   (:method (mixer buffer offset size)
     (declare (ignore mixer buffer offset size))))
@@ -535,15 +541,17 @@
               do
               (setf buffer-clear nil)
               (restart-case
-                  (funcall (if first
-                               #'streamer-write-into
-                               #'streamer-mix-into)
-                           streamer
-                           mixer
-                           buffer
-                           offset
-                           (- buffer-samples offset)
-                           (+ time offset))
+                  (handler-case
+                      (funcall (if first
+                                   #'streamer-write-into
+                                   #'streamer-mix-into)
+                               streamer
+                               mixer
+                               buffer
+                               offset
+                               (- buffer-samples offset)
+                               (+ time offset))
+                    (playback-finished () (mixer-remove-streamer mixer streamer)))
                 (remove-streamer ()
                   :report "Delete this audio stream"
                   (mixer-remove-streamer mixer streamer))))
@@ -850,3 +858,11 @@
   (floor (- (position-of stream)
             (start stream))
          (elts-per-sample stream)))
+
+(defclass dummy-mixer ()
+  ((rate :initform 44100 :initarg :rate)
+   (callback :initform nil :initarg :callback-on-streamer-remove :reader dummy-mixer-callback)))
+
+(defmethod mixer-remove-streamer ((mixer dummy-mixer) streamer)
+  (declare (ignore streamer))
+  (funcall (dummy-mixer-callback mixer)))
