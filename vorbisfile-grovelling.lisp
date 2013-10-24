@@ -8,7 +8,10 @@
 (cc-flags "-lvorbisfile"
           ;; For MacPorts installation:
           #+darwin "-I/opt/local/include/"
-          #+darwin "-L/opt/local/lib/")
+          #+darwin "-L/opt/local/lib/"
+          ;; For Homebrew instalation:
+          #+darwin "-I/usr/local/include/"
+          #+darwin "-L/usr/local/lib/")
 
 ;;;; Basic types
 
