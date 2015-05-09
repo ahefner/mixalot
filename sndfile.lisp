@@ -31,7 +31,7 @@
 (defconstant SFM_RDRW  #x30)
 
 (defctype SNDFILE* :pointer)
-(defctype SF_INFO* (:pointer SF_INFO))
+(defctype SF_INFO* (:pointer (:struct SF_INFO)))
 
 (defcfun sf-open SNDFILE*
   (path :string)
@@ -360,7 +360,7 @@
   (key-low :char)
   (key-high :char)
   (loopcount :int)
-  (loops SF_INSTRUMENT_LOOP :count 16))
+  (loops (:struct SF_INSTRUMENT_LOOP) :count 16))
 
 (defun sfc-get-lib-version ()
   (with-foreign-object (buffer :char 512)
