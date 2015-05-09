@@ -503,7 +503,7 @@
 
 (defcfun mpg123-info :int
   (mh handleptr)
-  (mi (:pointer frameinfo)))
+  (mi (:pointer (:struct frameinfo))))
 
 ;;; Scan each frame in the file, locating ID3 tags and computing an
 ;;; accurate length.
@@ -532,32 +532,32 @@
 
 ;;; Create and allocate memory for a new mpg123 string.
 (defcfun mpg123-init-string :void
-  (sb (:pointer mpg123-string)))
+  (sb (:pointer (:struct mpg123-string))))
 
 ;;; Free memory for an mpg123-string
 (defcfun mpg123-free-string :void
-  (sb (:pointer mpg123-string)))
+  (sb (:pointer (:struct mpg123-string))))
 
 ;;; Resize mpg123 string. Returns 1 on success, 0 on error.
 (defcfun mpg123-resize-string :int
-  (sb (:pointer mpg123-string))
+  (sb (:pointer (:struct mpg123-string)))
   (new-size size_t))
 
 ;;; Copy an mpg123-string. Returns 1 on success, 0 on error.
 (defcfun mpg123-copy-string :int
-  (from (:pointer mpg123-string))
-  (to   (:pointer mpg123-string)))
+  (from (:pointer (:struct mpg123-string)))
+  (to   (:pointer (:struct mpg123-string))))
 
 ;;; Append a C (or Lisp) string to an mpg123 string.
 ;;; Returns 1 on success, 0 on error.
 (defcfun mpg123-add-string :int
-  (stem (:pointer mpg123-string))
+  (stem (:pointer (:struct mpg123-string)))
   (tail :string))
 
 ;;; Assign a C (or Lisp) string to an mpg123 string.
 ;;; Returns 1 on success, 0 on error.
 (defcfun mpg123-set-string :int
-  (sb (:pointer mpg123-string))
+  (sb (:pointer (:struct mpg123-string)))
   (new-contents :string))
 
 ;;;; ID3 library
@@ -566,22 +566,22 @@
 (defcstruct mpg123-text ;; (mpg123-text :conc-name mpg123-text-)
   (lang :char :count 3)   ; Three-letter language code.
   (id   :char :count 4)   ; IDv2 text field ID
-  (description mpg123-string)
-  (text        mpg123-string))
+  (description (:struct mpg123-string))
+  (text        (:struct mpg123-string)))
 
 (defcstruct (mpg123-id3v2 :conc-name id3v2-)
   (version :uchar)
-  (title   (:pointer mpg123-string))
-  (artist  (:pointer mpg123-string))
-  (album   (:pointer mpg123-string))
-  (year    (:pointer mpg123-string))
-  (genre   (:pointer mpg123-string))
-  (comment (:pointer mpg123-string))
-  (comment-list (:pointer mpg123-text))
+  (title   (:pointer (:struct mpg123-string)))
+  (artist  (:pointer (:struct mpg123-string)))
+  (album   (:pointer (:struct mpg123-string)))
+  (year    (:pointer (:struct mpg123-string)))
+  (genre   (:pointer (:struct mpg123-string)))
+  (comment (:pointer (:struct mpg123-string)))
+  (comment-list (:pointer (:struct mpg123-text)))
   (comments     size_t)
-  (text         (:pointer mpg123-text))
+  (text         (:pointer (:struct mpg123-text)))
   (texts        size_t)
-  (extra        (:pointer mpg123-text))
+  (extra        (:pointer (:struct mpg123-text)))
   (extras       size_t))
 
 ;; FIXME: CFFI bug.
@@ -612,8 +612,8 @@
 ;;; Returns MPG123_OK or MPG123_ERR.
 (defcfun mpg123-id3 :int
   (mh handleptr)
-  (v1 (:pointer (:pointer mpg123-id3v1)))
-  (v2 (:pointer (:pointer mpg123-id3v2))))
+  (v1 (:pointer (:pointer (:struct mpg123-id3v1))))
+  (v2 (:pointer (:pointer (:struct mpg123-id3v2)))))
 
 ;;; Query ICY data. icy-meta is pointed to an existing data structure
 ;;; which may change after the next read/decode call.
@@ -730,7 +730,7 @@ encoding."
 (defun get-genre (v1 v2)
   (let ((v2-genre (nullify (get-id3v2-field v2 'id3v2-genre)))
         (v1-genre (and (not (null-pointer-p v1))
-                       (foreign-slot-value v1 'mpg123-id3v1 'genre))))
+                       (foreign-slot-value v1 '(:struct mpg123-id3v1) 'genre))))
     ;; Work around stupid numeric v2 genres that some program creates:
     (when (and (>= (length v2-genre) 3)
                (char= (aref v2-genre 0) #\()
@@ -798,7 +798,7 @@ encoding."
          year))))
 
 (defun get-bitstream-properties (handle)
-  (with-foreign-object (frameinfo 'frameinfo)
+  (with-foreign-object (frameinfo '(:struct frameinfo))
     (check-mpg123-plain-error
      "Get frameinfo"
      (mpg123-info handle frameinfo))
@@ -828,8 +828,8 @@ encoding."
 "Parse ID3 from the given mpg123 handle and return some subset of
 title, artist, album, year, comment, tack, and genre as a property
 list."
-  (with-foreign-objects ((v1p '(:pointer mpg123-id3v1))
-                         (v2p '(:pointer mpg123-id3v2)))
+  (with-foreign-objects ((v1p '(:pointer (:struct mpg123-id3v1)))
+                         (v2p '(:pointer (:struct mpg123-id3v2))))
     (check-mh-error "Get ID3 tags" handle (mpg123-id3 handle v1p v2p))
     (let ((v1 (mem-ref v1p :pointer))
           (v2 (mem-ref v2p :pointer))
