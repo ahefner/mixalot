@@ -689,7 +689,7 @@ encoding."
   (and (not (null-pointer-p v1))
        (trim-if-string
         (safely-convert-string
-         (foreign-slot-pointer v1 'mpg123-id3v1 v1-slot-name)
+         (foreign-slot-pointer v1 '(:struct mpg123-id3v1) v1-slot-name)
          :iso-8859-1 v1-field-width))))
 
 (defun id3-field-best-value (v1 v2 v2-accessor v1-slot-name v1-field-width)
@@ -748,27 +748,27 @@ encoding."
 (defun dump-mpg123-text (group n text)
   (format t "~& ~7<~A~> ~D: lang=~4A id=~4A description=~W text=~W~%"
           group n
-          (safely-convert-string (foreign-slot-pointer text 'mpg123-text 'lang)
+          (safely-convert-string (foreign-slot-pointer text '(:struct mpg123-text) 'lang)
                                  :iso-8859-1 3)
-          (safely-convert-string (foreign-slot-pointer text 'mpg123-text 'id)
+          (safely-convert-string (foreign-slot-pointer text '(:struct mpg123-text) 'id)
                                  :iso-8859-1 4)
-          (convert-mpg123-string (foreign-slot-pointer text 'mpg123-text 'description))
-          (convert-mpg123-string (foreign-slot-pointer text 'mpg123-text 'text))))
+          (convert-mpg123-string (foreign-slot-pointer text '(:struct mpg123-text) 'description))
+          (convert-mpg123-string (foreign-slot-pointer text '(:struct mpg123-text) 'text))))
 
 (defun find-text-tag (array-ptr n id)
   (loop for i from 0 below n
-        as text-ptr = (inc-pointer array-ptr (* i (foreign-type-size 'mpg123-text)))
+        as text-ptr = (inc-pointer array-ptr (* i (foreign-type-size '(:struct mpg123-text))))
         as this-id = (safely-convert-string
-                      (foreign-slot-pointer text-ptr 'mpg123-text 'id) :iso-8859-1 4)
+                      (foreign-slot-pointer text-ptr '(:struct mpg123-text) 'id) :iso-8859-1 4)
         when (equal id this-id)
         do (return
-             (convert-mpg123-string (foreign-slot-pointer text-ptr 'mpg123-text 'text)))))
+             (convert-mpg123-string (foreign-slot-pointer text-ptr '(:struct mpg123-text) 'text)))))
 
 (defun dump-mpg123-texts (group array-ptr n)
   (dotimes (i n)
     (dump-mpg123-text group i
      (inc-pointer array-ptr
-                  (* i (foreign-type-size 'mpg123-text))))))
+                  (* i (foreign-type-size '(:struct mpg123-text)))))))
 
 (defun get-track (v1 v2)
   (declare (ignore v1))
