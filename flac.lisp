@@ -161,9 +161,9 @@
   (declare (ignore handle client-data))
   (with-slots (buffer buffer-position buffer-size) *flac-decoder*
     (assert (null buffer-position))
-    (let* ((frame-header (foreign-slot-value frame 'flac-frame 'frame-header))
-           (num-channels (foreign-slot-value frame-header 'flac-frame-header 'channels))
-           (block-size (foreign-slot-value frame-header 'flac-frame-header 'block-size))
+    (let* ((frame-header-ptr (foreign-slot-pointer frame '(:struct flac-frame) 'frame-header))
+           (num-channels (foreign-slot-value frame-header-ptr '(:struct flac-frame-header) 'channels))
+           (block-size (foreign-slot-value frame-header-ptr '(:struct flac-frame-header) 'block-size))
            (num-samples (* num-channels block-size)))
       ;; Ensure sufficient buffer size:
       (when (< (length buffer) num-samples)
@@ -250,11 +250,11 @@
 ;;; Processing metadata
 (defun flac-process-stream-info (metadata)
   (let ((stream-info (foreign-slot-pointer
-                       (foreign-slot-pointer metadata 'flac-metadata 'data)
-                       'flac-metadata-data 'stream-info)))
+                       (foreign-slot-pointer metadata '(:struct flac-metadata) 'data)
+                       '(:union flac-metadata-data) 'stream-info)))
     (with-foreign-slots ((minimum-block-size maximum-block-size sample-rate
                           channels bits-per-sample total-samples)
-                         stream-info flac-metadata-stream-info)
+                         stream-info (:struct flac-metadata-stream-info))
       (list :minimum-block-size minimum-block-size
             :maximum-block-size maximum-block-size
             :sample-rate sample-rate
@@ -264,17 +264,19 @@
 
 (defun flac-process-vorbis-comment (metadata)
   (let* ((vorbis-comment (foreign-slot-pointer
-                           (foreign-slot-pointer metadata 'flac-metadata 'data)
-                           'flac-metadata-data 'vorbis-comment)))
-    (with-foreign-slots ((num-comments comments) vorbis-comment flac-metadata-vorbis-comment)
+                           (foreign-slot-pointer metadata '(:struct flac-metadata) 'data)
+                           '(:union flac-metadata-data) 'vorbis-comment)))
+    (with-foreign-slots ((num-comments comments)
+                         vorbis-comment
+                         (:struct flac-metadata-vorbis-comment))
       (loop for i from 0 below num-comments
-            for comment-entry = (mem-aref comments 'flac-metadata-vorbis-comment-entry i)
+            for comment-entry = (mem-aptr comments '(:struct flac-metadata-vorbis-comment-entry) i)
             collect (magic-string-conversion
                       (foreign-slot-value comment-entry
-                                          'flac-metadata-vorbis-comment-entry 'entry))))))
+                                          '(:struct flac-metadata-vorbis-comment-entry) 'entry))))))
 
 (defun flac-metadata-type (metadata)
-  (foreign-slot-value metadata 'flac-metadata 'type))
+  (foreign-slot-value metadata '(:struct flac-metadata) 'type))
 
 (defun flac-process-metadata-block (metadata)
   (let ((type (flac-metadata-type metadata)))
