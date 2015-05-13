@@ -25,5 +25,5 @@
 (in-package :flac)
 
 (defcunion flac-metadata-data
-  (stream-info flac-metadata-stream-info)
-  (vorbis-comment flac-metadata-vorbis-comment))
+  (stream-info (:struct flac-metadata-stream-info))
+  (vorbis-comment (:struct flac-metadata-vorbis-comment)))
