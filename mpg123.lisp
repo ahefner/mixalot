@@ -913,7 +913,7 @@ artist, album, year, comment, tack, and genre as a property list."
              (mpg123-format handle rate 2 MPG123_ENC_UNSIGNED_16)
              (mpg123-scan handle)
              (let* ((length (* channels (mpg123-length handle)))
-                    (buffer (make-array (* 2 length) :element-type '(signed-byte 16))))
+                    (buffer (make-array length :element-type '(signed-byte 16))))
                (with-foreign-objects ((nread 'size_t)
                                       (cbuffer :short 16384))
                  (loop as err = (mpg123-read handle cbuffer 32768 nread)
