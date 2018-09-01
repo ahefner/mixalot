@@ -147,23 +147,22 @@
 (defun vorbis-strerror (result)
   (cdr (assoc result *vorbis-strerror* :test #'eql)))
 
-(defun raise-vorbis-error (circumstance message)
-  "Raise an error for the vorbisfile library. Circumstance is a string
-  that describes the circumstance under which this error was raised, and
-  message is a string that (tries to) explain the error."
-  (error 'vorbis-error
-         :text (format nil "~A: ~A" circumstance message)))
+(defun warn-vorbis-error (circumstance message)
+  "Warn for an error for the vorbisfile library. Circumstance is a string
+  that describes the circumstance under which this warning was raised, and
+  message is a string that (tries to) explain it."
+  (warn "~A: ~A" circumstance message))
 
 (defun check-vorbis-error (circumstance result)
   "Check if an error has occured in the vorbisfile library calls."
   (when (< result 0)
-    (raise-vorbis-error circumstance
+    (warn-vorbis-error circumstance
                         (vorbis-strerror result))))
 
 (defun check-vorbis-pointer-error (circumstance pointer)
   "Check if an error has occured in the vorbisfile library calls pertaining to a pointer."
   (if (null-pointer-p pointer)
-    (raise-vorbis-error circumstance
+    (warn-vorbis-error circumstance
                         "Operation performed on invalid physical or logical stream.")
     pointer))
 
