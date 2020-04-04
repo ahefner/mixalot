@@ -92,7 +92,8 @@
 (in-package :mixalot)
 
 (eval-when (:compile-toplevel)
-  #-linux (pushnew 'use-ao *features*)
+;;;; "The mixer component of Mixalot chooses at compile time to use ALSA (on Linux) or libao (everywhere else)" From page: http://vintage-digital.com/hefner/software/mixalot/mixalot.html in section "Portability"
+  #-linux (pushnew 'use-ao *features*) 
   #+linux (pushnew 'use-alsa *features*))
 
 (deftype array-index ()
