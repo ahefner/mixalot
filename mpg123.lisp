@@ -182,6 +182,7 @@
               "libmpg123.so.0"
               "/usr/lib/libmpg123.so"
               "/usr/local/lib/libmpg123.so"))
+  (:os-windows (:or "libmpg123-0.dll"))
   (t (:default "libmpg123")))
 
 (use-foreign-library libmpg123)
