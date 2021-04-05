@@ -304,9 +304,13 @@
            (ao-fmt-rate fmt) rate
            (ao-fmt-byte-format fmt) AO_FMT_LITTLE
            (ao-fmt-matrix fmt) matrix)
-    (ao-open-live (ao-default-driver-id)
-                   fmt
-                   (null-pointer)))))
+      (let ((device (ao-open-live (ao-default-driver-id)
+                                  fmt
+                                  (null-pointer))))
+        (when (null-pointer-p device)
+          ;; TODO: see errno via CFFI-grovel.
+          (error "libao ao-open-live failed."))
+        device))))
 
 #+mixalot::use-ao
 (defun main-thread-init ()
