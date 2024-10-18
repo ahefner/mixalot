@@ -6,6 +6,8 @@
 
 (include "FLAC/stream_decoder.h")
 (cc-flags "-lFLAC" "-lm"
+          #+freebsd "-I/usr/local/include"
+          #+freebsd "-L/usr/local/lib"
           #+darwin "-I/opt/local/include"
           #+darwin "-L/opt/local/lib")
 
