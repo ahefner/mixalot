@@ -306,9 +306,13 @@
            (ao-fmt-rate fmt) rate
            (ao-fmt-byte-format fmt) AO_FMT_LITTLE
            (ao-fmt-matrix fmt) matrix)
-    (ao-open-live (ao-default-driver-id)
-                   fmt
-                   (null-pointer)))))
+      (let ((device (ao-open-live (ao-default-driver-id)
+                                  fmt
+                                  (null-pointer))))
+        (when (null-pointer-p device)
+          ;; TODO: see errno via CFFI-grovel.
+          (error "libao ao-open-live failed."))
+        device))))
 
 #+mixalot::use-ao
 (defun main-thread-init ()
@@ -617,18 +621,21 @@ should be output in STREAMER-MIX-INTO or STREAMER-WRITE-INTO."
   #-(or mixalot::use-ao mixalot::use-alsa)
   (error "Neither mixalot::use-ao nor mixalot::use-alsa existed on *features* when this function was compiled. That is wrong.")
   (let ((mixer (funcall constructor :rate rate)))
+    #+mixalot::use-alsa
     (bordeaux-threads:make-thread
      (lambda ()
-       #+mixalot::use-ao
-       (progn
-         (setf (mixer-device mixer) (open-ao :rate rate))
-         (run-mixer-process mixer))
-       #+mixalot::use-alsa
        (call-with-pcm rate
         (lambda (pcm)
           (setf (mixer-device mixer) pcm)
           (run-mixer-process mixer))))
      :name (format nil "Mixer thread ~:D Hz" rate))
+    #+mixalot::use-ao
+    (let ((device (open-ao :rate rate)))
+      (setf (mixer-device mixer) device)
+      (bordeaux-threads:make-thread
+       (lambda ()
+         (run-mixer-process mixer))
+       :name (format nil "Mixer thread ~:D Hz" rate)))
     mixer))
 
 (defun destroy-mixer (mixer)
