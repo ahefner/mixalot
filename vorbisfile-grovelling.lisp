@@ -6,6 +6,8 @@
 
 (include "vorbis/vorbisfile.h")
 (cc-flags "-lvorbisfile"
+          #+freebsd "-I/usr/local/include/"
+          #+freebsd "-L/usr/local/lib/"
           ;; For MacPorts installation:
           #+darwin "-I/opt/local/include/"
           #+darwin "-L/opt/local/lib/"
