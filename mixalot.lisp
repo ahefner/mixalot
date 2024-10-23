@@ -91,8 +91,9 @@
 
 (in-package :mixalot)
 
+;;; The mixer component of Mixalot chooses at compile time to use ALSA (on Linux) or libao (everywhere else)
 (eval-when (:compile-toplevel)
-  #-linux (pushnew 'use-ao *features*)
+  #-linux (pushnew 'use-ao *features*) 
   #+linux (pushnew 'use-alsa *features*))
 
 (deftype array-index ()
@@ -259,6 +260,7 @@
 #+mixalot::use-ao
 (define-foreign-library libao
   (:darwin (:or "libao.4.dylib" "/opt/local/lib/libao.4.dylib"))
+  (:os-windows (:or "libao-4.dll"))
   (t (:or "libao.so")))
 
 #+mixalot::use-ao (use-foreign-library libao)
