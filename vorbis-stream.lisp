@@ -36,12 +36,12 @@
             ;; XXX DUBIOUS
             (unless (= output-rate rate)
               #+NIL
-              (raise-vorbis-error "Open Ogg Vorbis file"
+              (warn-vorbis-error "Open Ogg Vorbis file"
                                   "Sample rate doesn't match requested rate.")
               (warn "Sample rate doesn't match requested rate: ~:D vs expected ~:D"
                     rate output-rate))
             (unless (or (= channels 2) (= channels 1))
-              (raise-vorbis-error "Open Ogg Vorbis file"
+              (warn-vorbis-error "Open Ogg Vorbis file"
                                   "Vorbis file is not mono or stereo."))
             (rotatef handle uhandle))
           (when uhandle (vorbis-close uhandle))))

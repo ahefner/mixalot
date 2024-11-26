@@ -3,7 +3,7 @@
   (:export #:vorbis-error
            #:vorbis-strerror
            #:check-vorbis-error
-           #:raise-vorbis-error
+           #:warn-vorbis-error
 
            #:vorbis-new
            #:vorbis-delete
